@@ -1,4 +1,4 @@
- Fitness Tracker — GitHub Pages Deployment
+# Fitness Tracker — GitHub Pages Deployment
 
 Single-file React app + PWA manifest + service worker. Hosts on GitHub
 Pages for free, installs to your phone home screen, saves to localStorage,

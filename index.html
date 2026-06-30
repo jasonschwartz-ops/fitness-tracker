@@ -58,6 +58,11 @@ const BookOpen = (p) => <Icon {...p} d={<><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0
 const MapPin = (p) => <Icon {...p} d={<><path d="M20 10c0 7-8 13-8 13s-8-6-8-13a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>} />;
 const Trash2 = (p) => <Icon {...p} d={<><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>} />;
 const Star = (p) => <Icon {...p} d={<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>} />;
+const Flower2 = (p) => <Icon {...p} d={<><path d="M12 5a3 3 0 1 1 3 3m-3-3a3 3 0 1 0-3 3m3-3v1M9 8a3 3 0 1 0 3 3M9 8h1m5 0a3 3 0 1 1-3 3m3-3h-1m-2 3v-1"/><circle cx="12" cy="8" r="2"/><path d="M12 10v12"/><path d="M12 22c4.2 0 7-1.667 7-5-4.2 0-7 1.667-7 5Z"/><path d="M12 22c-4.2 0-7-1.667-7-5 4.2 0 7 1.667 7 5Z"/></>} />;
+const Bike = (p) => <Icon {...p} d={<><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2"/></>} />;
+const Waves = (p) => <Icon {...p} d={<><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></>} />;
+const Activity = (p) => <Icon {...p} d={<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>} />;
+const PlayCircle = (p) => <Icon {...p} d={<><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></>} />;
 
 // === BEGIN APP ===
 
@@ -91,33 +96,144 @@ const storage = {
   },
 };
 
+// Standard exercise catalog — users can add from these to any workout
+const EXERCISE_CATALOG = [
+  // Squat pattern
+  { id: 'goblet_squat', name: 'Goblet Squat', pattern: 'Squat', repRange: [6, 10], startWeight: 35,
+    cues: 'Hold one dumbbell vertically at chest, elbows under it. Squat between your knees, chest up, knees tracking over toes. Go to at least parallel. Front-loaded weight forces good posture.' },
+  { id: 'back_squat', name: 'Back Squat', pattern: 'Squat', repRange: [5, 8], startWeight: 95,
+    cues: 'Bar on upper back (not neck). Brace, break at hips and knees together, sit between your heels. Knees track over toes, drive through mid-foot. Depth: hip crease below top of knee.' },
+  { id: 'front_squat', name: 'Front Squat', pattern: 'Squat', repRange: [5, 8], startWeight: 65,
+    cues: 'Bar racked on front delts, elbows high. Stay upright, squat down keeping torso vertical. Demands more core and quad than back squat.' },
+  { id: 'split_squat', name: 'Bulgarian Split Squat', pattern: 'Squat', repRange: [8, 12], startWeight: 25,
+    cues: 'Rear foot elevated on bench. Drop straight down on the front leg, knee tracking over toes. Brutal single-leg builder. Hold dumbbells at sides.' },
+  // Hinge pattern
+  { id: 'rdl', name: 'Romanian Deadlift', pattern: 'Hinge', repRange: [6, 8], startWeight: 95,
+    cues: 'Hips back, not down. Soft knees, bar slides down thighs, flat back. Stop at hamstring stretch (mid-shin), drive hips forward to stand. Squeeze glutes at top.' },
+  { id: 'deadlift', name: 'Conventional Deadlift', pattern: 'Hinge', repRange: [3, 6], startWeight: 135,
+    cues: 'Bar over mid-foot. Hinge to grip, flat back, chest up, slack out of the bar. Push the floor away, bar drags up your legs. Lock out hips and knees together. Heaviest lift you do — respect it.' },
+  { id: 'good_morning', name: 'Good Morning', pattern: 'Hinge', repRange: [8, 12], startWeight: 45,
+    cues: 'Bar on back like a squat. Soft knees, hinge forward at the hips with a flat back until torso is near parallel, then drive back up. Lighter than you think — hamstrings and lower back.' },
+  // Horizontal push
+  { id: 'bench', name: 'DB Bench Press', pattern: 'Push (horizontal)', repRange: [6, 10], startWeight: 30,
+    cues: 'Wrists stacked over elbows, feet planted, shoulder blades pinched. Press up and slightly together, lower under control (2s down). Don\u2019t clang the bells at the top.' },
+  { id: 'bb_bench', name: 'Barbell Bench Press', pattern: 'Push (horizontal)', repRange: [5, 8], startWeight: 95,
+    cues: 'Grip just outside shoulder width. Pull bar out of rack, lower to mid-chest with elbows ~45\u00b0, touch, press back over shoulders. Slight arch, shoulder blades retracted and down.' },
+  { id: 'pushup', name: 'Push-up', pattern: 'Push (horizontal)', repRange: [8, 20], startWeight: 0,
+    cues: 'Hands under shoulders, body in a straight line, brace your core. Lower until chest nearly touches, elbows ~45\u00b0, press back up. Add a weighted vest or pause reps to progress.' },
+  // Vertical push
+  { id: 'ohp', name: 'Overhead Press', pattern: 'Push (vertical)', repRange: [6, 8], startWeight: 25,
+    cues: 'Dumbbells at shoulder height, palms forward (or neutral for happier shoulders). Brace hard so the lower back doesn\u2019t arch, press straight up to lockout. Lower with control.' },
+  { id: 'bb_ohp', name: 'Barbell Strict Press', pattern: 'Push (vertical)', repRange: [5, 8], startWeight: 65,
+    cues: 'Bar on front delts, grip just outside shoulders. Brace glutes and abs, press the bar up and slightly back so it finishes over mid-foot. Move your head "through the window" at lockout.' },
+  { id: 'arnold', name: 'Arnold Press', pattern: 'Push (vertical)', repRange: [8, 12], startWeight: 20,
+    cues: 'Start palms facing you at chest, rotate palms outward as you press overhead. Hits all three delt heads. Lighter weight, controlled tempo.' },
+  // Horizontal pull
+  { id: 'row', name: 'One-Arm DB Row', pattern: 'Pull (horizontal)', repRange: [8, 10], startWeight: 30,
+    cues: 'Knee and hand on bench, torso parallel to floor. Let the bell hang, then drive your elbow back to your hip (not chest), squeezing the shoulder blade. Don\u2019t rotate your torso.' },
+  { id: 'bb_row', name: 'Barbell Bent-Over Row', pattern: 'Pull (horizontal)', repRange: [6, 10], startWeight: 65,
+    cues: 'Hinge to ~45\u00b0, flat back. Pull bar to lower ribs/upper belly, elbows driving back, squeeze shoulder blades. Lower under control. Keep the torso angle fixed — no heaving.' },
+  { id: 'chest_supported_row', name: 'Chest-Supported Row', pattern: 'Pull (horizontal)', repRange: [10, 12], startWeight: 25,
+    cues: 'Chest on an incline bench, dumbbells hanging. Row both up to your hips, squeeze, lower slow. Removes all lower-back strain — pure upper-back work.' },
+  // Vertical pull
+  { id: 'pullup', name: 'Pull-up / Lat Pulldown', pattern: 'Pull (vertical)', repRange: [6, 10], startWeight: 0,
+    cues: 'Full hang at the bottom, pull your chest to the bar by driving elbows down and back, chin over. Control the descent. Use a band or the pulldown machine if you can\u2019t hit the rep range yet.' },
+  { id: 'chinup', name: 'Chin-up', pattern: 'Pull (vertical)', repRange: [5, 10], startWeight: 0,
+    cues: 'Underhand grip, shoulder width. Easier than pull-ups for most — more biceps. Full hang to chin over bar, slow negative.' },
+  // Accessories
+  { id: 'curl', name: 'DB Bicep Curl', pattern: 'Accessory', repRange: [10, 15], startWeight: 20,
+    cues: 'Elbows pinned to your sides, curl without swinging. Squeeze at the top, lower slow. Strict form beats heavy ego weight here.' },
+  { id: 'tricep_ext', name: 'Overhead Tricep Extension', pattern: 'Accessory', repRange: [10, 15], startWeight: 25,
+    cues: 'One dumbbell held overhead with both hands, lower behind your head by bending elbows, keep elbows pointing up and still. Extend back to lockout.' },
+  { id: 'lateral_raise', name: 'Lateral Raise', pattern: 'Accessory', repRange: [12, 20], startWeight: 10,
+    cues: 'Slight bend in elbows, raise dumbbells out to the sides to shoulder height, lead with the elbows. Light weight, high reps, no swinging. Builds shoulder width.' },
+  { id: 'plank', name: 'Plank', pattern: 'Accessory', repRange: [1, 1], startWeight: 0,
+    cues: 'Forearms down, body in a straight line, brace abs and glutes hard. Don\u2019t let hips sag or pike. Log seconds held in the reps field.' },
+  { id: 'calf_raise', name: 'Standing Calf Raise', pattern: 'Accessory', repRange: [12, 20], startWeight: 25,
+    cues: 'Balls of feet on a step or plate, drop the heels for a stretch, drive up onto your toes, pause at the top. Full range, controlled. Hold dumbbells to load.' },
+];
+
+function catalogById(id) {
+  return EXERCISE_CATALOG.find(e => e.id === id);
+}
+
 const WORKOUTS = {
   A: {
-    name: 'Workout A',
-    focus: 'Squat • Press • Pull',
-    cue: 'Goblet squat: knees track over toes, chest up, drive through mid-foot.',
+    name: 'Day A',
+    focus: 'Upper • Horizontal',
+    cue: 'Bench: wrists over elbows, shoulder blades pinched. Row: drive elbow to hip.',
     exercises: [
-      { id: 'squat', name: 'Goblet / Back Squat', sets: 3, repRange: [6, 8], startWeight: 45 },
-      { id: 'bench', name: 'DB Bench Press', sets: 3, repRange: [6, 8], startWeight: 30 },
-      { id: 'row', name: 'One-Arm DB Row', sets: 3, repRange: [8, 10], startWeight: 30 },
+      { id: 'bench', name: 'DB Bench Press', sets: 3, repRange: [6, 10], startWeight: 30,
+        cues: 'Wrists stacked over elbows, feet planted, shoulder blades pinched. Press up and slightly together, lower under control (2s down). Don\u2019t clang the bells at the top.' },
+      { id: 'row', name: 'One-Arm DB Row', sets: 3, repRange: [8, 10], startWeight: 30,
+        cues: 'Knee and hand on bench, torso parallel to floor. Drive your elbow back to your hip, squeeze the shoulder blade. Don\u2019t rotate your torso.' },
+      { id: 'lateral_raise', name: 'Lateral Raise', sets: 3, repRange: [12, 20], startWeight: 10,
+        cues: 'Slight bend in elbows, raise dumbbells out to the sides to shoulder height, lead with the elbows. Light weight, high reps, no swinging. Builds shoulder width.' },
+      { id: 'curl', name: 'DB Bicep Curl', sets: 3, repRange: [10, 15], startWeight: 20,
+        cues: 'Elbows pinned to your sides, curl without swinging. Squeeze at the top, lower slow. Strict form beats heavy ego weight here.' },
     ],
   },
   B: {
-    name: 'Workout B',
-    focus: 'Hinge • Overhead • Vertical Pull',
+    name: 'Day B',
+    focus: 'Lower • Squat',
+    cue: 'Squat: knees track over toes, chest up, drive through mid-foot. Sit between your heels.',
+    exercises: [
+      { id: 'squat', name: 'Goblet / Back Squat', sets: 3, repRange: [6, 8], startWeight: 45,
+        cues: 'Hold weight at chest (goblet) or on your back (barbell). Brace, sit between your heels, knees tracking over toes, chest up. Depth: hip crease below top of knee. Drive through mid-foot.' },
+      { id: 'split_squat', name: 'Bulgarian Split Squat', sets: 3, repRange: [8, 12], startWeight: 25,
+        cues: 'Rear foot elevated on bench. Drop straight down on the front leg, knee tracking over toes. Hold dumbbells at sides. Brutal single-leg builder.' },
+      { id: 'calf_raise', name: 'Standing Calf Raise', sets: 3, repRange: [12, 20], startWeight: 25,
+        cues: 'Balls of feet on a step or plate, drop the heels for a stretch, drive up onto your toes, pause at the top. Full range, controlled. Hold dumbbells to load.' },
+      { id: 'plank', name: 'Plank', sets: 3, repRange: [1, 1], startWeight: 0,
+        cues: 'Forearms down, body in a straight line, brace abs and glutes hard. Don\u2019t let hips sag or pike. Log seconds held in the reps field.' },
+    ],
+  },
+  C: {
+    name: 'Day C',
+    focus: 'Upper • Vertical',
+    cue: 'Overhead press: brace hard so the lower back doesn\u2019t arch. Pull-up: full hang, chin over.',
+    exercises: [
+      { id: 'ohp', name: 'Overhead Press', sets: 3, repRange: [6, 8], startWeight: 25,
+        cues: 'Dumbbells at shoulder height, palms forward (or neutral for happier shoulders). Brace hard so the lower back doesn\u2019t arch, press straight up to lockout. Lower with control.' },
+      { id: 'pullup', name: 'Pull-up / Lat Pulldown', sets: 3, repRange: [6, 10], startWeight: 0,
+        cues: 'Full hang at the bottom, pull your chest to the bar, chin over. Control the descent. Use a band or the pulldown machine if you can\u2019t hit the rep range yet.' },
+      { id: 'chest_supported_row', name: 'Chest-Supported Row', sets: 3, repRange: [10, 12], startWeight: 25,
+        cues: 'Chest on an incline bench, dumbbells hanging. Row both up to your hips, squeeze, lower slow. Removes all lower-back strain — pure upper-back work.' },
+      { id: 'tricep_ext', name: 'Overhead Tricep Extension', sets: 3, repRange: [10, 15], startWeight: 25,
+        cues: 'One dumbbell held overhead with both hands, lower behind your head by bending elbows, keep elbows pointing up and still. Extend back to lockout.' },
+    ],
+  },
+  D: {
+    name: 'Day D',
+    focus: 'Lower • Hinge',
     cue: 'RDL: hips back, not down. Bar slides down thighs. Stop at hamstring stretch.',
     exercises: [
-      { id: 'rdl', name: 'Romanian Deadlift', sets: 3, repRange: [6, 8], startWeight: 95 },
-      { id: 'ohp', name: 'Overhead Press', sets: 3, repRange: [6, 8], startWeight: 25 },
-      { id: 'pullup', name: 'Pull-up / Lat Pulldown', sets: 3, repRange: [6, 10], startWeight: 0 },
+      { id: 'rdl', name: 'Romanian Deadlift', sets: 3, repRange: [6, 8], startWeight: 95,
+        cues: 'Hips back, not down. Soft knees, bar slides down thighs, flat back. Stop at hamstring stretch (mid-shin), drive hips forward to stand. Squeeze glutes at top.' },
+      { id: 'good_morning', name: 'Good Morning', sets: 3, repRange: [8, 12], startWeight: 45,
+        cues: 'Bar on back like a squat. Soft knees, hinge forward at the hips with a flat back until torso is near parallel, then drive back up. Lighter than you think — hamstrings and lower back.' },
+      { id: 'calf_raise', name: 'Standing Calf Raise', sets: 3, repRange: [12, 20], startWeight: 25,
+        cues: 'Balls of feet on a step or plate, drop the heels for a stretch, drive up onto your toes, pause at the top. Full range, controlled. Hold dumbbells to load.' },
+      { id: 'plank', name: 'Plank', sets: 3, repRange: [1, 1], startWeight: 0,
+        cues: 'Forearms down, body in a straight line, brace abs and glutes hard. Don\u2019t let hips sag or pike. Log seconds held in the reps field.' },
     ],
   },
 };
+
+// Order the 4-day cycle advances in
+const WORKOUT_CYCLE = ['A', 'B', 'C', 'D'];
 
 const DAILY_CAL_TARGET = 2100;
 const DAILY_PROTEIN_TARGET = 150;
 // Average stride for a 5'9" adult walking — ~2.2 feet = 2400 steps/mile
 const STEPS_PER_MILE = 2400;
+
+// Build a clean demo search URL for a given exercise name.
+// YouTube search by name never rots and lets you pick the demonstration you like.
+function demoUrl(exName) {
+  const q = encodeURIComponent(exName + ' proper form how to');
+  return `https://www.youtube.com/results?search_query=${q}`;
+}
 
 // Starter recipes — based on the meal plan we built
 const STARTER_RECIPES = [
@@ -163,10 +279,12 @@ function FitnessTracker() {
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [workoutLogs, setWorkoutLogs] = useState([]);
   const [walkLogs, setWalkLogs] = useState([]);
+  const [yogaLogs, setYogaLogs] = useState([]);
   const [weighIns, setWeighIns] = useState([]);
   const [mealLogs, setMealLogs] = useState([]);
   const [recipes, setRecipes] = useState([]);
   const [routes, setRoutes] = useState([]);
+  const [customExercises, setCustomExercises] = useState({}); // { A: [exDef], B: [...], ... }
   const [activeWorkout, setActiveWorkout] = useState(null);
   const [activeSession, setActiveSession] = useState(null);
 
@@ -179,10 +297,12 @@ function FitnessTracker() {
 
         const workouts = [];
         const walks = [];
+        const yogas = [];
         const weights = [];
         const meals = [];
         const recipesFromStorage = [];
         const routesFromStorage = [];
+        let customExercisesFromStorage = {};
         let seedFlag = null;
 
         for (const key of keyList) {
@@ -192,10 +312,12 @@ function FitnessTracker() {
             const data = JSON.parse(result.value);
             if (key.startsWith('workout:')) workouts.push(data);
             else if (key.startsWith('walk:')) walks.push(data);
+            else if (key.startsWith('yoga:')) yogas.push(data);
             else if (key.startsWith('weigh:')) weights.push(data);
             else if (key.startsWith('meal:')) meals.push(data);
             else if (key.startsWith('recipe:')) recipesFromStorage.push(data);
             else if (key.startsWith('route:')) routesFromStorage.push(data);
+            else if (key === 'custom_exercises') customExercisesFromStorage = data;
             else if (key === 'meta:seeded') seedFlag = data;
           } catch (e) { /* skip bad keys */ }
         }
@@ -217,10 +339,12 @@ function FitnessTracker() {
 
         setWorkoutLogs(workouts.sort((a, b) => b.timestamp - a.timestamp));
         setWalkLogs(walks.sort((a, b) => b.timestamp - a.timestamp));
+        setYogaLogs(yogas.sort((a, b) => b.timestamp - a.timestamp));
         setWeighIns(weights.sort((a, b) => b.timestamp - a.timestamp));
         setMealLogs(meals.sort((a, b) => b.timestamp - a.timestamp));
         setRecipes(recipesFromStorage.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.uses - a.uses));
         setRoutes(routesFromStorage.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.uses - a.uses));
+        setCustomExercises(customExercisesFromStorage);
       } catch (e) {
         console.error('Load error:', e);
       }
@@ -234,42 +358,88 @@ function FitnessTracker() {
     const lastSession = workoutLogs.find(w => w.workout === workoutKey);
     if (!lastSession) {
       const ex = WORKOUTS[workoutKey].exercises.find(e => e.id === exerciseId);
-      return { weight: ex.startWeight, note: 'starting weight' };
+      return { weight: ex.startWeight, reps: [], note: 'starting weight' };
     }
     const lastEx = lastSession.exercises.find(e => e.id === exerciseId);
     if (!lastEx) {
       const ex = WORKOUTS[workoutKey].exercises.find(e => e.id === exerciseId);
-      return { weight: ex.startWeight, note: 'starting weight' };
+      return { weight: ex.startWeight, reps: [], note: 'starting weight' };
     }
     const exDef = WORKOUTS[workoutKey].exercises.find(e => e.id === exerciseId);
     const topRep = exDef.repRange[1];
+    const lastReps = lastEx.sets.map(s => s.reps);
     const hitAllReps = lastEx.sets.every(s => s.reps >= topRep);
     if (hitAllReps) {
-      const increment = exerciseId === 'squat' || exerciseId === 'rdl' ? 10 : 5;
-      return { weight: lastEx.sets[0].weight + increment, note: `+${increment} lb (progression)` };
+      const increment = exerciseId === 'squat' || exerciseId === 'rdl' || exerciseId === 'back_squat' || exerciseId === 'deadlift' ? 10 : 5;
+      return { weight: lastEx.sets[0].weight + increment, reps: lastReps, note: `+${increment} lb (progression)` };
     }
-    return { weight: lastEx.sets[0].weight, note: 'repeat (consolidate)' };
+    return { weight: lastEx.sets[0].weight, reps: lastReps, note: 'repeat (consolidate)' };
   };
 
   const startWorkout = (key) => {
     const workout = WORKOUTS[key];
+    const extras = customExercises[key] || [];
+    const allExercises = [...workout.exercises, ...extras];
     const session = {
       workout: key,
-      exercises: workout.exercises.map(ex => {
+      exercises: allExercises.map(ex => {
         const suggestion = getNextWeight(key, ex.id);
         return {
           id: ex.id,
           name: ex.name,
           repRange: ex.repRange,
+          cues: ex.cues,
           suggestedWeight: suggestion.weight,
           suggestedNote: suggestion.note,
-          sets: Array(ex.sets).fill(null).map(() => ({ weight: suggestion.weight, reps: 0, done: false })),
+          sets: Array(ex.sets || 3).fill(null).map((_, i) => ({
+            weight: suggestion.weight,
+            // Prefill reps from last session's matching set; 0 if none
+            reps: suggestion.reps[i] != null ? suggestion.reps[i] : 0,
+            done: false,
+          })),
         };
       }),
     };
     setActiveWorkout(key);
     setActiveSession(session);
     setView('active-workout');
+  };
+
+  // Add an exercise (from catalog or custom) into a specific day
+  const addExerciseToDay = async (dayKey, exDef) => {
+    const current = customExercises[dayKey] || [];
+    // Avoid duplicate ids within the same day
+    if (current.some(e => e.id === exDef.id) || WORKOUTS[dayKey].exercises.some(e => e.id === exDef.id)) {
+      return { ok: false, reason: 'already in this day' };
+    }
+    const updated = { ...customExercises, [dayKey]: [...current, exDef] };
+    setCustomExercises(updated);
+    await storage.set('custom_exercises', JSON.stringify(updated));
+    return { ok: true };
+  };
+
+  const removeExerciseFromDay = async (dayKey, exId) => {
+    const current = customExercises[dayKey] || [];
+    const updated = { ...customExercises, [dayKey]: current.filter(e => e.id !== exId) };
+    setCustomExercises(updated);
+    await storage.set('custom_exercises', JSON.stringify(updated));
+  };
+
+  // getNextWeight needs to see custom exercises too
+  const getNextWeightForDef = (exDef, dayKey) => {
+    const lastSession = workoutLogs.find(w => w.workout === dayKey);
+    if (!lastSession) return { weight: exDef.startWeight, reps: [], note: 'starting weight' };
+    const lastEx = lastSession.exercises.find(e => e.id === exDef.id);
+    if (!lastEx) return { weight: exDef.startWeight, reps: [], note: 'starting weight' };
+    const topRep = exDef.repRange[1];
+    const lastReps = lastEx.sets.map(s => s.reps);
+    const hitAllReps = lastEx.sets.every(s => s.reps >= topRep);
+    if (hitAllReps) {
+      const heavyCompound = ['squat', 'rdl', 'back_squat', 'deadlift', 'front_squat', 'good_morning'].includes(exDef.id);
+      const increment = heavyCompound ? 10 : 5;
+      return { weight: lastEx.sets[0].weight + increment, reps: lastReps, note: `+${increment} lb (progression)` };
+    }
+    return { weight: lastEx.sets[0].weight, reps: lastReps, note: 'repeat (consolidate)' };
   };
 
   const updateSet = (exIdx, setIdx, field, value) => {
@@ -437,6 +607,7 @@ function FitnessTracker() {
           walkLogs={walkLogs}
           weighIns={weighIns}
           mealLogs={mealLogs}
+          yogaLogs={yogaLogs}
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
           onStartWorkout={startWorkout}
@@ -448,9 +619,13 @@ function FitnessTracker() {
           session={activeSession}
           workoutKey={activeWorkout}
           selectedDate={selectedDate}
+          customExercises={customExercises}
           onUpdateSet={updateSet}
           onToggleDone={toggleSetDone}
           onFinish={finishWorkout}
+          onAddExercise={addExerciseToDay}
+          onRemoveExercise={removeExerciseFromDay}
+          getNextWeightForDef={getNextWeightForDef}
           onCancel={() => { setActiveSession(null); setView('home'); }}
         />
       )}
@@ -467,6 +642,19 @@ function FitnessTracker() {
           }}
           onUseRoute={useRoute}
           onManageRoutes={() => setView('routes')}
+          onBack={() => setView('home')}
+        />
+      )}
+      {view === 'yoga' && (
+        <YogaView
+          yogaLogs={yogaLogs}
+          selectedDate={selectedDate}
+          onSave={async (yoga) => {
+            const record = { id: `yoga_${Date.now()}`, timestamp: Date.now(), date: selectedDate, ...yoga };
+            await storage.set(`yoga:${record.id}`, JSON.stringify(record));
+            setYogaLogs([record, ...yogaLogs]);
+            setView('home');
+          }}
           onBack={() => setView('home')}
         />
       )}
@@ -530,7 +718,7 @@ function FitnessTracker() {
   );
 }
 
-function HomeView({ workoutLogs, walkLogs, weighIns, mealLogs, selectedDate, onSelectDate, onStartWorkout, onNavigate }) {
+function HomeView({ workoutLogs, walkLogs, weighIns, mealLogs, yogaLogs, selectedDate, onSelectDate, onStartWorkout, onNavigate }) {
   const today = todayStr();
   const isToday = selectedDate === today;
   const isFuture = selectedDate > today;
@@ -540,11 +728,13 @@ function HomeView({ workoutLogs, walkLogs, weighIns, mealLogs, selectedDate, onS
   const dayWalk = walkLogs.find(w => w.date === selectedDate);
   const dayWeight = weighIns.find(w => w.date === selectedDate);
   const dayWorkout = workoutLogs.find(w => w.date === selectedDate);
+  const dayYoga = (yogaLogs || []).find(y => y.date === selectedDate);
   const latestWeight = weighIns[0];
 
   // Figure out which workout is next (alternate)
   const lastWorkout = workoutLogs[0];
-  const nextWorkoutKey = lastWorkout?.workout === 'A' ? 'B' : 'A';
+  const lastIdx = lastWorkout ? WORKOUT_CYCLE.indexOf(lastWorkout.workout) : -1;
+  const nextWorkoutKey = WORKOUT_CYCLE[(lastIdx + 1) % WORKOUT_CYCLE.length];
 
   // Streak: consecutive days with any activity
   const calcStreak = () => {
@@ -620,18 +810,15 @@ function HomeView({ workoutLogs, walkLogs, weighIns, mealLogs, selectedDate, onS
             <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase">Next session</div>
             <div className="flex gap-1 items-center">
               <span className="mono text-[10px] text-stone-600 tracking-wider uppercase mr-1">Start:</span>
-              <button
-                onClick={() => onStartWorkout('A')}
-                className={`mono text-xs tracking-wider uppercase px-3 py-1 border ${nextWorkoutKey === 'A' ? 'border-amber-600 text-amber-400 bg-amber-950/30' : 'border-stone-700 text-stone-400 hover:text-stone-100'}`}
-              >
-                A
-              </button>
-              <button
-                onClick={() => onStartWorkout('B')}
-                className={`mono text-xs tracking-wider uppercase px-3 py-1 border ${nextWorkoutKey === 'B' ? 'border-amber-600 text-amber-400 bg-amber-950/30' : 'border-stone-700 text-stone-400 hover:text-stone-100'}`}
-              >
-                B
-              </button>
+              {WORKOUT_CYCLE.map((key) => (
+                <button
+                  key={key}
+                  onClick={() => onStartWorkout(key)}
+                  className={`mono text-xs tracking-wider uppercase px-3 py-1 border ${nextWorkoutKey === key ? 'border-amber-600 text-amber-400 bg-amber-950/30' : 'border-stone-700 text-stone-400 hover:text-stone-100'}`}
+                >
+                  {key}
+                </button>
+              ))}
             </div>
           </div>
           <button
@@ -668,14 +855,15 @@ function HomeView({ workoutLogs, walkLogs, weighIns, mealLogs, selectedDate, onS
         <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase mb-3">
           Log {isToday ? 'for today' : `for ${humanDate(selectedDate).toLowerCase()}`}
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <QuickButton icon={<Footprints className="w-5 h-5" />} label="Walk" active={!!dayWalk} onClick={() => onNavigate('walk')} />
+        <div className="grid grid-cols-2 gap-2">
+          <QuickButton icon={<Footprints className="w-5 h-5" />} label="Mobility" active={!!dayWalk} onClick={() => onNavigate('walk')} />
+          <QuickButton icon={<Flower2 className="w-5 h-5" />} label="Yoga" active={!!dayYoga} onClick={() => onNavigate('yoga')} />
           <QuickButton icon={<Scale className="w-5 h-5" />} label="Weigh" active={!!dayWeight} onClick={() => onNavigate('weigh')} />
           <QuickButton icon={<Utensils className="w-5 h-5" />} label="Meal" active={dayMeals.length > 0} onClick={() => onNavigate('meal')} />
         </div>
         {dayWalk && (
           <div className="mt-3 mono text-xs text-emerald-600 tracking-wider uppercase">
-            ✓ {dayWalk.miles} mi logged{dayWalk.steps ? ` (${dayWalk.steps.toLocaleString()} steps)` : ''}
+            ✓ {dayWalk.activityType || 'walk'}: {dayWalk.miles ? `${dayWalk.miles} mi` : `${dayWalk.minutes} min`}{dayWalk.steps ? ` (${dayWalk.steps.toLocaleString()} steps)` : ''}
           </div>
         )}
       </div>
@@ -813,13 +1001,21 @@ function QuickButton({ icon, label, onClick, active }) {
   );
 }
 
-function ActiveWorkoutView({ session, workoutKey, selectedDate, onUpdateSet, onToggleDone, onFinish, onCancel }) {
+function ActiveWorkoutView({ session, workoutKey, selectedDate, customExercises, onUpdateSet, onToggleDone, onFinish, onAddExercise, onRemoveExercise, getNextWeightForDef, onCancel }) {
   const workout = WORKOUTS[workoutKey];
   const totalSets = session.exercises.reduce((s, e) => s + e.sets.length, 0);
   // A set counts as "done" if either the user tapped the checkmark OR they entered reps
   const isSetComplete = (set) => set.done || set.reps > 0;
   const doneSets = session.exercises.reduce((s, e) => s + e.sets.filter(isSetComplete).length, 0);
   const isBackdated = selectedDate !== todayStr();
+  const [showPicker, setShowPicker] = useState(false);
+
+  // ids already present in this day (template + custom)
+  const presentIds = new Set([
+    ...workout.exercises.map(e => e.id),
+    ...(customExercises[workoutKey] || []).map(e => e.id),
+  ]);
+  const dayCustom = customExercises[workoutKey] || [];
 
   return (
     <div className="px-6 pt-8">
@@ -846,39 +1042,160 @@ function ActiveWorkoutView({ session, workoutKey, selectedDate, onUpdateSet, onT
       </div>
 
       <div className="space-y-8">
-        {session.exercises.map((ex, exIdx) => (
-          <div key={ex.id} className="border-t border-stone-800 pt-6">
-            <div className="flex items-start justify-between mb-1">
-              <h3 className="display text-2xl">{ex.name}</h3>
-              <div className="mono text-xs text-stone-500 tracking-wider uppercase mt-2">
-                {ex.repRange[0]}–{ex.repRange[1]} reps
-              </div>
-            </div>
-            <div className="mono text-xs text-amber-700 mb-4 tracking-wider uppercase">
-              {ex.suggestedNote}
-            </div>
-            <div className="space-y-2">
-              {ex.sets.map((set, setIdx) => (
-                <SetRow
-                  key={setIdx}
-                  set={set}
-                  setNum={setIdx + 1}
-                  onUpdate={(field, value) => onUpdateSet(exIdx, setIdx, field, value)}
-                  onToggleDone={() => onToggleDone(exIdx, setIdx)}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
+        {session.exercises.map((ex, exIdx) => {
+          const isCustom = dayCustom.some(c => c.id === ex.id);
+          return (
+            <ExerciseBlock
+              key={ex.id}
+              ex={ex}
+              exIdx={exIdx}
+              isCustom={isCustom}
+              onRemove={isCustom ? () => onRemoveExercise(workoutKey, ex.id) : null}
+              onUpdateSet={onUpdateSet}
+              onToggleDone={onToggleDone}
+            />
+          );
+        })}
+      </div>
+
+      {/* Add exercise from library */}
+      <div className="mt-8 border-t border-stone-800 pt-6">
+        {!showPicker ? (
+          <button
+            onClick={() => setShowPicker(true)}
+            className="w-full border border-stone-700 text-stone-300 p-4 flex items-center justify-center gap-2 hover:bg-stone-900 transition-colors mono text-xs tracking-wider uppercase"
+          >
+            <Plus className="w-4 h-4" /> Add exercise to {workout.name}
+          </button>
+        ) : (
+          <ExercisePicker
+            presentIds={presentIds}
+            onPick={async (exDef) => {
+              await onAddExercise(workoutKey, exDef);
+              setShowPicker(false);
+            }}
+            onClose={() => setShowPicker(false)}
+          />
+        )}
+        <div className="mono text-[10px] text-stone-700 tracking-wider text-center mt-3">
+          Added exercises stay in {workout.name} every time you run it.
+        </div>
       </div>
 
       <button
         onClick={onFinish}
         disabled={doneSets === 0}
-        className="w-full mt-10 bg-amber-600 text-stone-950 p-5 display text-2xl hover:bg-amber-500 disabled:bg-stone-800 disabled:text-stone-600 transition-colors"
+        className="w-full mt-8 bg-amber-600 text-stone-950 p-5 display text-2xl hover:bg-amber-500 disabled:bg-stone-800 disabled:text-stone-600 transition-colors"
       >
         Finish & Save
       </button>
+    </div>
+  );
+}
+
+function ExercisePicker({ presentIds, onPick, onClose }) {
+  const [patternFilter, setPatternFilter] = useState('All');
+  const patterns = ['All', ...Array.from(new Set(EXERCISE_CATALOG.map(e => e.pattern)))];
+  const available = EXERCISE_CATALOG.filter(e =>
+    !presentIds.has(e.id) && (patternFilter === 'All' || e.pattern === patternFilter)
+  );
+
+  return (
+    <div className="border border-stone-700 p-4">
+      <div className="flex items-center justify-between mb-4">
+        <span className="mono text-xs text-stone-300 tracking-wider uppercase">Exercise library</span>
+        <button onClick={onClose} className="text-stone-500 hover:text-stone-300"><X className="w-4 h-4" /></button>
+      </div>
+      <div className="flex flex-wrap gap-1 mb-4">
+        {patterns.map(p => (
+          <button
+            key={p}
+            onClick={() => setPatternFilter(p)}
+            className={`mono text-[10px] tracking-wider uppercase px-2 py-1 border ${patternFilter === p ? 'border-amber-600 text-amber-400' : 'border-stone-800 text-stone-500'}`}
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+      <div className="space-y-2 max-h-96 overflow-y-auto">
+        {available.length === 0 && (
+          <div className="text-stone-500 italic text-sm py-4 text-center">Nothing left to add in this category.</div>
+        )}
+        {available.map(ex => (
+          <button
+            key={ex.id}
+            onClick={() => onPick({ id: ex.id, name: ex.name, sets: 3, repRange: ex.repRange, startWeight: ex.startWeight, cues: ex.cues })}
+            className="w-full border border-stone-800 hover:border-amber-600 hover:bg-amber-950/20 p-3 text-left flex items-start gap-3 transition-colors"
+          >
+            <Plus className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="text-stone-100">{ex.name}</div>
+              <div className="mono text-[10px] text-stone-500 mt-0.5 tracking-wider uppercase">
+                {ex.pattern} · {ex.repRange[0]}–{ex.repRange[1]} reps
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ExerciseBlock({ ex, exIdx, isCustom, onRemove, onUpdateSet, onToggleDone }) {
+  const [showCues, setShowCues] = useState(false);
+  return (
+    <div className="border-t border-stone-800 pt-6">
+      <div className="flex items-start justify-between mb-1">
+        <h3 className="display text-2xl">{ex.name}</h3>
+        <div className="mono text-xs text-stone-500 tracking-wider uppercase mt-2">
+          {ex.repRange[0]}–{ex.repRange[1]} reps
+        </div>
+      </div>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="mono text-xs text-amber-700 tracking-wider uppercase">
+          {ex.suggestedNote}
+        </div>
+        {ex.cues && (
+          <button
+            onClick={() => setShowCues(!showCues)}
+            className="mono text-xs text-stone-500 tracking-wider uppercase border border-stone-800 px-2 py-0.5 hover:text-stone-300 hover:border-stone-600"
+          >
+            {showCues ? 'Hide form' : 'Form'}
+          </button>
+        )}
+        <a
+          href={demoUrl(ex.name)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mono text-xs text-stone-500 tracking-wider uppercase border border-stone-800 px-2 py-0.5 hover:text-amber-400 hover:border-amber-700 inline-flex items-center gap-1"
+        >
+          <PlayCircle className="w-3 h-3" /> Demo
+        </a>
+        {isCustom && onRemove && (
+          <button
+            onClick={() => { if (confirm(`Remove ${ex.name} from this day?`)) onRemove(); }}
+            className="mono text-xs text-stone-600 tracking-wider uppercase border border-stone-800 px-2 py-0.5 hover:text-red-400 hover:border-red-900"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      {showCues && ex.cues && (
+        <div className="border-l-2 border-stone-700 pl-4 mb-4 text-sm text-stone-400 leading-relaxed">
+          {ex.cues}
+        </div>
+      )}
+      <div className="space-y-2">
+        {ex.sets.map((set, setIdx) => (
+          <SetRow
+            key={setIdx}
+            set={set}
+            setNum={setIdx + 1}
+            onUpdate={(field, value) => onUpdateSet(exIdx, setIdx, field, value)}
+            onToggleDone={() => onToggleDone(exIdx, setIdx)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -929,12 +1246,13 @@ function SetRow({ set, setNum, onUpdate, onToggleDone }) {
 }
 
 function WalkView({ walkLogs, routes, selectedDate, onSave, onUseRoute, onManageRoutes, onBack }) {
-  const [inputMode, setInputMode] = useState('miles'); // 'miles' or 'steps'
+  const [activity, setActivity] = useState('walk'); // 'walk' | 'bike' | 'swim'
+  const [inputMode, setInputMode] = useState('miles'); // for walk: 'miles' or 'steps'; for bike: 'miles' or 'minutes'
   const [miles, setMiles] = useState('3');
   const [steps, setSteps] = useState('7200');
   const [minutes, setMinutes] = useState('60');
+  const [laps, setLaps] = useState('');
 
-  // Compute the miles value that will be saved
   const computedMiles = inputMode === 'miles'
     ? parseFloat(miles) || 0
     : (parseFloat(steps) || 0) / STEPS_PER_MILE;
@@ -946,16 +1264,79 @@ function WalkView({ walkLogs, routes, selectedDate, onSave, onUseRoute, onManage
   const isBackdated = selectedDate !== todayStr();
   const topRoutes = routes.slice(0, 4);
 
+  const activities = [
+    { key: 'walk', label: 'Walk', Icon: Footprints, color: 'emerald' },
+    { key: 'bike', label: 'Bike', Icon: Bike, color: 'emerald' },
+    { key: 'swim', label: 'Swim', Icon: Waves, color: 'emerald' },
+  ];
+
+  // Rough calorie estimates (per unit) — light reference only
+  const estCal = activity === 'walk'
+    ? Math.round(computedMiles * 110)
+    : activity === 'bike'
+    ? Math.round((parseFloat(minutes) || 0) * 8)
+    : Math.round((parseFloat(minutes) || 0) * 9);
+
+  const canSave = activity === 'walk'
+    ? (computedMiles > 0 && minutes)
+    : activity === 'bike'
+    ? ((parseFloat(miles) > 0 || parseInt(minutes) > 0))
+    : (parseInt(minutes) > 0);
+
+  const handleSave = () => {
+    if (activity === 'walk') {
+      onSave({
+        activityType: 'walk',
+        miles: parseFloat(computedMiles.toFixed(2)),
+        steps: computedSteps,
+        minutes: parseInt(minutes) || 0,
+        inputMode,
+      });
+    } else if (activity === 'bike') {
+      onSave({
+        activityType: 'bike',
+        miles: parseFloat(miles) || 0,
+        minutes: parseInt(minutes) || 0,
+      });
+    } else {
+      onSave({
+        activityType: 'swim',
+        minutes: parseInt(minutes) || 0,
+        laps: parseInt(laps) || 0,
+      });
+    }
+  };
+
+  const title = activity === 'walk' ? 'Log a walk.' : activity === 'bike' ? 'Log a ride.' : 'Log a swim.';
+
   return (
     <div className="px-6 pt-8">
       <button onClick={onBack} className="mono text-xs text-stone-500 tracking-wider uppercase mb-4 hover:text-stone-300">← Back</button>
       <div className={`mono text-xs tracking-[0.2em] uppercase mb-2 ${isBackdated ? 'text-amber-500' : 'text-stone-500'}`}>
         {humanDate(selectedDate)}
       </div>
-      <h1 className="display text-5xl mb-8">Log a walk.</h1>
+      <h1 className="display text-5xl mb-8">{title}</h1>
 
-      {/* Saved routes quick-pick */}
-      {topRoutes.length > 0 && (
+      {/* Activity type picker */}
+      <div className="grid grid-cols-3 gap-2 mb-8">
+        {activities.map(a => {
+          const Ico = a.Icon;
+          const on = activity === a.key;
+          return (
+            <button
+              key={a.key}
+              onClick={() => { setActivity(a.key); if (a.key !== 'walk') setInputMode('miles'); }}
+              className={`border p-4 flex flex-col items-center gap-2 transition-colors ${on ? 'border-emerald-600 bg-emerald-950/40 text-emerald-300' : 'border-stone-800 text-stone-400 hover:bg-stone-900'}`}
+            >
+              <Ico className="w-6 h-6" />
+              <span className="mono text-xs tracking-wider uppercase">{a.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Saved routes quick-pick — walk only */}
+      {activity === 'walk' && topRoutes.length > 0 && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">
             <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase">Your routes</div>
@@ -988,73 +1369,160 @@ function WalkView({ walkLogs, routes, selectedDate, onSave, onUseRoute, onManage
         </div>
       )}
 
-      {/* Input mode toggle */}
-      <div className="grid grid-cols-2 gap-2 mb-6">
-        <button
-          onClick={() => setInputMode('miles')}
-          className={`border py-3 mono text-xs tracking-wider uppercase ${inputMode === 'miles' ? 'border-amber-600 bg-amber-950/40 text-amber-300' : 'border-stone-800 text-stone-500'}`}
-        >
-          Enter miles
-        </button>
-        <button
-          onClick={() => setInputMode('steps')}
-          className={`border py-3 mono text-xs tracking-wider uppercase ${inputMode === 'steps' ? 'border-amber-600 bg-amber-950/40 text-amber-300' : 'border-stone-800 text-stone-500'}`}
-        >
-          Enter steps
-        </button>
-      </div>
+      {/* WALK inputs */}
+      {activity === 'walk' && (
+        <>
+          <div className="grid grid-cols-2 gap-2 mb-6">
+            <button
+              onClick={() => setInputMode('miles')}
+              className={`border py-3 mono text-xs tracking-wider uppercase ${inputMode === 'miles' ? 'border-amber-600 bg-amber-950/40 text-amber-300' : 'border-stone-800 text-stone-500'}`}
+            >
+              Enter miles
+            </button>
+            <button
+              onClick={() => setInputMode('steps')}
+              className={`border py-3 mono text-xs tracking-wider uppercase ${inputMode === 'steps' ? 'border-amber-600 bg-amber-950/40 text-amber-300' : 'border-stone-800 text-stone-500'}`}
+            >
+              Enter steps
+            </button>
+          </div>
+          <div className="space-y-6">
+            {inputMode === 'miles' ? (
+              <Field label="Miles">
+                <input type="number" step="0.1" value={miles} onChange={(e) => setMiles(e.target.value)}
+                  className="w-full bg-transparent border-b border-stone-700 text-4xl display py-3 focus:border-amber-600 outline-none" />
+                <div className="mono text-xs text-stone-500 mt-2 tracking-wider uppercase">≈ {computedSteps.toLocaleString()} steps</div>
+              </Field>
+            ) : (
+              <Field label="Steps">
+                <input type="number" step="100" value={steps} onChange={(e) => setSteps(e.target.value)}
+                  className="w-full bg-transparent border-b border-stone-700 text-4xl display py-3 focus:border-amber-600 outline-none" />
+                <div className="mono text-xs text-stone-500 mt-2 tracking-wider uppercase">≈ {computedMiles.toFixed(2)} miles <span className="text-stone-700">· 2,400 steps/mile</span></div>
+              </Field>
+            )}
+            <Field label="Minutes">
+              <input type="number" value={minutes} onChange={(e) => setMinutes(e.target.value)}
+                className="w-full bg-transparent border-b border-stone-700 text-4xl display py-3 focus:border-amber-600 outline-none" />
+            </Field>
+            <div className="mono text-xs text-stone-500 pt-2">
+              Pace: {minutes && computedMiles ? (parseFloat(minutes) / computedMiles).toFixed(1) : '—'} min/mile
+            </div>
+          </div>
+        </>
+      )}
 
-      <div className="space-y-6">
-        {inputMode === 'miles' ? (
-          <Field label="Miles">
-            <input
-              type="number"
-              step="0.1"
-              value={miles}
-              onChange={(e) => setMiles(e.target.value)}
-              className="w-full bg-transparent border-b border-stone-700 text-4xl display py-3 focus:border-amber-600 outline-none"
-            />
-            <div className="mono text-xs text-stone-500 mt-2 tracking-wider uppercase">
-              ≈ {computedSteps.toLocaleString()} steps
-            </div>
+      {/* BIKE inputs — distance and/or time */}
+      {activity === 'bike' && (
+        <div className="space-y-6">
+          <Field label="Miles (optional)">
+            <input type="number" step="0.1" value={miles} onChange={(e) => setMiles(e.target.value)}
+              className="w-full bg-transparent border-b border-stone-700 text-4xl display py-3 focus:border-amber-600 outline-none" />
           </Field>
-        ) : (
-          <Field label="Steps">
-            <input
-              type="number"
-              step="100"
-              value={steps}
-              onChange={(e) => setSteps(e.target.value)}
-              className="w-full bg-transparent border-b border-stone-700 text-4xl display py-3 focus:border-amber-600 outline-none"
-            />
-            <div className="mono text-xs text-stone-500 mt-2 tracking-wider uppercase">
-              ≈ {computedMiles.toFixed(2)} miles <span className="text-stone-700">· based on 2,400 steps/mile</span>
-            </div>
+          <Field label="Minutes">
+            <input type="number" value={minutes} onChange={(e) => setMinutes(e.target.value)}
+              className="w-full bg-transparent border-b border-stone-700 text-4xl display py-3 focus:border-amber-600 outline-none" />
           </Field>
-        )}
+          <div className="mono text-xs text-stone-500 pt-2">
+            {miles && minutes ? `${(parseFloat(miles) / (parseFloat(minutes) / 60)).toFixed(1)} mph avg` : 'Enter distance and time for average speed'}
+          </div>
+        </div>
+      )}
+
+      {/* SWIM inputs — time and optional laps */}
+      {activity === 'swim' && (
+        <div className="space-y-6">
+          <Field label="Minutes">
+            <input type="number" value={minutes} onChange={(e) => setMinutes(e.target.value)}
+              className="w-full bg-transparent border-b border-stone-700 text-4xl display py-3 focus:border-amber-600 outline-none" />
+          </Field>
+          <Field label="Laps (optional)">
+            <input type="number" value={laps} onChange={(e) => setLaps(e.target.value)} placeholder="e.g. 20"
+              className="w-full bg-transparent border-b border-stone-700 text-4xl display py-3 focus:border-amber-600 outline-none placeholder:text-stone-700" />
+          </Field>
+          <div className="mono text-xs text-stone-600 pt-2">Low-impact — easy on the joints.</div>
+        </div>
+      )}
+
+      <button
+        onClick={handleSave}
+        disabled={!canSave}
+        className="w-full mt-10 bg-emerald-700 text-stone-100 p-5 display text-2xl hover:bg-emerald-600 disabled:bg-stone-800 disabled:text-stone-600 transition-colors"
+      >
+        Save {activity === 'walk' ? 'Walk' : activity === 'bike' ? 'Ride' : 'Swim'}
+      </button>
+    </div>
+  );
+}
+
+function YogaView({ yogaLogs, selectedDate, onSave, onBack }) {
+  const existingForDate = (yogaLogs || []).find(y => y.date === selectedDate);
+  const [minutes, setMinutes] = useState(existingForDate?.minutes?.toString() || '25');
+  const [intensity, setIntensity] = useState(existingForDate?.intensity || 'gentle');
+  const [style, setStyle] = useState(existingForDate?.style || '');
+  const isBackdated = selectedDate !== todayStr();
+
+  const intensities = [
+    { key: 'gentle', label: 'Gentle', note: 'Restorative, yin, stretch-focused' },
+    { key: 'moderate', label: 'Moderate', note: 'Hatha, vinyasa flow' },
+    { key: 'vigorous', label: 'Vigorous', note: 'Power, hot, strong flow' },
+  ];
+
+  return (
+    <div className="px-6 pt-8">
+      <button onClick={onBack} className="mono text-xs text-stone-500 tracking-wider uppercase mb-4 hover:text-stone-300">← Back</button>
+      <div className={`mono text-xs tracking-[0.2em] uppercase mb-2 ${isBackdated ? 'text-amber-500' : 'text-stone-500'}`}>
+        {humanDate(selectedDate)}
+      </div>
+      <h1 className="display text-5xl mb-8">Log yoga.</h1>
+      {existingForDate && (
+        <div className="mono text-xs text-amber-600 tracking-wider uppercase mb-4">
+          Replacing existing entry for this day
+        </div>
+      )}
+
+      <div className="space-y-8">
         <Field label="Minutes">
           <input
             type="number"
             value={minutes}
             onChange={(e) => setMinutes(e.target.value)}
-            className="w-full bg-transparent border-b border-stone-700 text-4xl display py-3 focus:border-amber-600 outline-none"
+            className="w-full bg-transparent border-b border-stone-700 text-5xl display py-3 focus:border-amber-600 outline-none"
           />
         </Field>
-        <div className="mono text-xs text-stone-500 pt-2">
-          Pace: {minutes && computedMiles ? (parseFloat(minutes) / computedMiles).toFixed(1) : '—'} min/mile · Est. {Math.round(computedMiles * 110)} cal
+
+        <div>
+          <label className="mono text-xs text-stone-500 tracking-wider uppercase mb-3 block">Intensity</label>
+          <div className="space-y-2">
+            {intensities.map(it => (
+              <button
+                key={it.key}
+                onClick={() => setIntensity(it.key)}
+                className={`w-full border p-4 text-left transition-colors ${intensity === it.key ? 'border-amber-600 bg-amber-950/30' : 'border-stone-800 hover:border-stone-600'}`}
+              >
+                <div className={`text-lg ${intensity === it.key ? 'text-amber-300' : 'text-stone-200'}`}>{it.label}</div>
+                <div className="mono text-[10px] text-stone-500 tracking-wider uppercase mt-1">{it.note}</div>
+              </button>
+            ))}
+          </div>
         </div>
+
+        <Field label="Style (optional)">
+          <input
+            type="text"
+            value={style}
+            onChange={(e) => setStyle(e.target.value)}
+            placeholder="e.g. vinyasa, yin, hatha"
+            className="w-full bg-transparent border-b border-stone-700 text-xl py-3 focus:border-amber-600 outline-none placeholder:text-stone-700"
+          />
+        </Field>
       </div>
+
       <button
-        onClick={() => onSave({
-          miles: parseFloat(computedMiles.toFixed(2)),
-          steps: computedSteps,
-          minutes: parseInt(minutes),
-          inputMode,
-        })}
-        disabled={!computedMiles || !minutes}
-        className="w-full mt-10 bg-emerald-700 text-stone-100 p-5 display text-2xl hover:bg-emerald-600 disabled:bg-stone-800 disabled:text-stone-600 transition-colors"
+        onClick={() => onSave({ minutes: parseInt(minutes) || 0, intensity, style })}
+        disabled={!minutes || parseInt(minutes) <= 0}
+        className="w-full mt-10 bg-amber-600 text-stone-950 p-5 display text-2xl hover:bg-amber-500 disabled:bg-stone-800 disabled:text-stone-600 transition-colors"
       >
-        Save Walk
+        Save Yoga
       </button>
     </div>
   );
