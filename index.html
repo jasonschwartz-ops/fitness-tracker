@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tracker">
+<meta name="theme-color" content="#0c0a09">
+<meta name="description" content="Personal fitness and nutrition tracker">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<title>Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  body { margin: 0; background: #0c0a09; font-family: Georgia, "Times New Roman", serif; }
+  .display { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .grain { background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0); background-size: 4px 4px; }
+  input[type="number"] { -moz-appearance: textfield; }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-type="module">
+const { useState, useEffect } = React;
+
+// Inline SVG icon components (replacing lucide-react)
+const Icon = ({ d, className = "w-4 h-4", fill = "none", strokeWidth = 2 }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
+    {d}
+  </svg>
+);
+const Dumbbell = (p) => <Icon {...p} d={<><path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/></>} />;
+const Footprints = (p) => <Icon {...p} d={<><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></>} />;
+const Scale = (p) => <Icon {...p} d={<><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></>} />;
+const Utensils = (p) => <Icon {...p} d={<><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></>} />;
+const TrendingUp = (p) => <Icon {...p} d={<><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>} />;
+const Check = (p) => <Icon {...p} d={<polyline points="20 6 9 17 4 12"/>} />;
+const Plus = (p) => <Icon {...p} d={<><path d="M5 12h14"/><path d="M12 5v14"/></>} />;
+const Minus = (p) => <Icon {...p} d={<path d="M5 12h14"/>} />;
+const ChevronRight = (p) => <Icon {...p} d={<polyline points="9 18 15 12 9 6"/>} />;
+const Target = (p) => <Icon {...p} d={<><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>} />;
+const Flame = (p) => <Icon {...p} d={<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>} />;
+const X = (p) => <Icon {...p} d={<><path d="M18 6 6 18"/><path d="m6 6 12 12"/></>} />;
+const BookOpen = (p) => <Icon {...p} d={<><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>} />;
+const MapPin = (p) => <Icon {...p} d={<><path d="M20 10c0 7-8 13-8 13s-8-6-8-13a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>} />;
+const Trash2 = (p) => <Icon {...p} d={<><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>} />;
+const Star = (p) => <Icon {...p} d={<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>} />;
+
+// === BEGIN APP ===
+
+// localStorage shim that mirrors the Claude storage API
+// All data persists in this browser. To wipe, clear localStorage for this site.
+const STORAGE_PREFIX = 'fitness_tracker:';
+const storage = {
+  async get(key) {
+    const raw = localStorage.getItem(STORAGE_PREFIX + key);
+    if (raw === null) return null;
+    return { key, value: raw, shared: false };
+  },
+  async set(key, value) {
+    localStorage.setItem(STORAGE_PREFIX + key, value);
+    return { key, value, shared: false };
+  },
+  async delete(key) {
+    localStorage.removeItem(STORAGE_PREFIX + key);
+    return { key, deleted: true, shared: false };
+  },
+  async list(prefix = '') {
+    const keys = [];
+    const fullPrefix = STORAGE_PREFIX + prefix;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(fullPrefix)) {
+        keys.push(k.substring(STORAGE_PREFIX.length));
+      }
+    }
+    return { keys, prefix, shared: false };
+  },
+};
+
+const WORKOUTS = {
+  A: {
+    name: 'Workout A',
+    focus: 'Squat • Press • Pull',
+    cue: 'Goblet squat: knees track over toes, chest up, drive through mid-foot.',
+    exercises: [
+      { id: 'squat', name: 'Goblet / Back Squat', sets: 3, repRange: [6, 8], startWeight: 45 },
+      { id: 'bench', name: 'DB Bench Press', sets: 3, repRange: [6, 8], startWeight: 30 },
+      { id: 'row', name: 'One-Arm DB Row', sets: 3, repRange: [8, 10], startWeight: 30 },
+    ],
+  },
+  B: {
+    name: 'Workout B',
+    focus: 'Hinge • Overhead • Vertical Pull',
+    cue: 'RDL: hips back, not down. Bar slides down thighs. Stop at hamstring stretch.',
+    exercises: [
+      { id: 'rdl', name: 'Romanian Deadlift', sets: 3, repRange: [6, 8], startWeight: 95 },
+      { id: 'ohp', name: 'Overhead Press', sets: 3, repRange: [6, 8], startWeight: 25 },
+      { id: 'pullup', name: 'Pull-up / Lat Pulldown', sets: 3, repRange: [6, 10], startWeight: 0 },
+    ],
+  },
+};
+
+const DAILY_CAL_TARGET = 2100;
+const DAILY_PROTEIN_TARGET = 150;
+// Average stride for a 5'9" adult walking — ~2.2 feet = 2400 steps/mile
+const STEPS_PER_MILE = 2400;
+
+// Starter recipes — based on the meal plan we built
+const STARTER_RECIPES = [
+  { id: 'r1', name: 'Grilled chicken Greek salad', calories: 650, protein: 55, mealType: 'lunch', notes: '8oz chicken thighs, feta, cucumber, tomato, olive oil, small sourdough' },
+  { id: 'r2', name: 'Ribeye + sweet potato + broccoli', calories: 1100, protein: 80, mealType: 'dinner', notes: '8oz ribeye, medium baked sweet potato w/ butter, roasted broccoli' },
+  { id: 'r3', name: 'Smoked salmon + eggs + avocado', calories: 750, protein: 45, mealType: 'lunch', notes: '4oz salmon, 2 eggs, half avocado, whole grain toast, berries' },
+  { id: 'r4', name: 'Chicken thighs + rice + veg', calories: 900, protein: 65, mealType: 'dinner', notes: '8oz chicken thighs, 1 cup jasmine rice, roasted veg, olive oil' },
+  { id: 'r5', name: 'Bunless burger + salad', calories: 700, protein: 50, mealType: 'lunch', notes: '8oz grass-fed patty, large salad, baked sweet potato fries' },
+  { id: 'r6', name: 'Shrimp + scallops + risotto', calories: 1050, protein: 70, mealType: 'dinner', notes: '6oz shrimp, 4oz scallops, reasonable risotto portion, asparagus' },
+  { id: 'r7', name: 'Greek yogurt + nuts + berries', calories: 380, protein: 30, mealType: 'snack', notes: '1 cup full-fat Greek yogurt, handful almonds, mixed berries' },
+  { id: 'r8', name: 'Sashimi dinner', calories: 600, protein: 55, mealType: 'dinner', notes: 'Heavy sashimi order, edamame, light on rolls' },
+];
+
+// Starter routes — placeholders you can edit/replace
+const STARTER_ROUTES = [
+  { id: 'rt1', name: 'Neighborhood loop', miles: 3.0, minutes: 55, notes: 'Standard daily walk with wife' },
+  { id: 'rt2', name: 'Long loop', miles: 4.2, minutes: 75, notes: 'Weekend extended version' },
+  { id: 'rt3', name: 'Quick out-and-back', miles: 2.0, minutes: 35, notes: 'Short day, still counts' },
+];
+
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function dateStrOffset(baseStr, offsetDays) {
+  const d = new Date(baseStr + 'T12:00:00');
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().split('T')[0];
+}
+
+function humanDate(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const today = todayStr();
+  const yesterday = dateStrOffset(today, -1);
+  if (dateStr === today) return 'Today';
+  if (dateStr === yesterday) return 'Yesterday';
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
+function FitnessTracker() {
+  const [view, setView] = useState('home');
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(todayStr());
+  const [workoutLogs, setWorkoutLogs] = useState([]);
+  const [walkLogs, setWalkLogs] = useState([]);
+  const [weighIns, setWeighIns] = useState([]);
+  const [mealLogs, setMealLogs] = useState([]);
+  const [recipes, setRecipes] = useState([]);
+  const [routes, setRoutes] = useState([]);
+  const [activeWorkout, setActiveWorkout] = useState(null);
+  const [activeSession, setActiveSession] = useState(null);
+
+  // Load data from persistent storage
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const keys = await storage.list('');
+        const keyList = keys?.keys || [];
+
+        const workouts = [];
+        const walks = [];
+        const weights = [];
+        const meals = [];
+        const recipesFromStorage = [];
+        const routesFromStorage = [];
+        let seedFlag = null;
+
+        for (const key of keyList) {
+          try {
+            const result = await storage.get(key);
+            if (!result) continue;
+            const data = JSON.parse(result.value);
+            if (key.startsWith('workout:')) workouts.push(data);
+            else if (key.startsWith('walk:')) walks.push(data);
+            else if (key.startsWith('weigh:')) weights.push(data);
+            else if (key.startsWith('meal:')) meals.push(data);
+            else if (key.startsWith('recipe:')) recipesFromStorage.push(data);
+            else if (key.startsWith('route:')) routesFromStorage.push(data);
+            else if (key === 'meta:seeded') seedFlag = data;
+          } catch (e) { /* skip bad keys */ }
+        }
+
+        // Seed starters on first run only
+        if (!seedFlag) {
+          for (const r of STARTER_RECIPES) {
+            const rec = { ...r, timestamp: Date.now(), uses: 0, favorite: false };
+            await storage.set(`recipe:${r.id}`, JSON.stringify(rec));
+            recipesFromStorage.push(rec);
+          }
+          for (const rt of STARTER_ROUTES) {
+            const route = { ...rt, timestamp: Date.now(), uses: 0, favorite: false };
+            await storage.set(`route:${rt.id}`, JSON.stringify(route));
+            routesFromStorage.push(route);
+          }
+          await storage.set('meta:seeded', JSON.stringify({ seeded: true, at: Date.now() }));
+        }
+
+        setWorkoutLogs(workouts.sort((a, b) => b.timestamp - a.timestamp));
+        setWalkLogs(walks.sort((a, b) => b.timestamp - a.timestamp));
+        setWeighIns(weights.sort((a, b) => b.timestamp - a.timestamp));
+        setMealLogs(meals.sort((a, b) => b.timestamp - a.timestamp));
+        setRecipes(recipesFromStorage.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.uses - a.uses));
+        setRoutes(routesFromStorage.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.uses - a.uses));
+      } catch (e) {
+        console.error('Load error:', e);
+      }
+      setLoading(false);
+    }
+    loadData();
+  }, []);
+
+  // Derived: suggest next weight for each exercise based on last session
+  const getNextWeight = (workoutKey, exerciseId) => {
+    const lastSession = workoutLogs.find(w => w.workout === workoutKey);
+    if (!lastSession) {
+      const ex = WORKOUTS[workoutKey].exercises.find(e => e.id === exerciseId);
+      return { weight: ex.startWeight, note: 'starting weight' };
+    }
+    const lastEx = lastSession.exercises.find(e => e.id === exerciseId);
+    if (!lastEx) {
+      const ex = WORKOUTS[workoutKey].exercises.find(e => e.id === exerciseId);
+      return { weight: ex.startWeight, note: 'starting weight' };
+    }
+    const exDef = WORKOUTS[workoutKey].exercises.find(e => e.id === exerciseId);
+    const topRep = exDef.repRange[1];
+    const hitAllReps = lastEx.sets.every(s => s.reps >= topRep);
+    if (hitAllReps) {
+      const increment = exerciseId === 'squat' || exerciseId === 'rdl' ? 10 : 5;
+      return { weight: lastEx.sets[0].weight + increment, note: `+${increment} lb (progression)` };
+    }
+    return { weight: lastEx.sets[0].weight, note: 'repeat (consolidate)' };
+  };
+
+  const startWorkout = (key) => {
+    const workout = WORKOUTS[key];
+    const session = {
+      workout: key,
+      exercises: workout.exercises.map(ex => {
+        const suggestion = getNextWeight(key, ex.id);
+        return {
+          id: ex.id,
+          name: ex.name,
+          repRange: ex.repRange,
+          suggestedWeight: suggestion.weight,
+          suggestedNote: suggestion.note,
+          sets: Array(ex.sets).fill(null).map(() => ({ weight: suggestion.weight, reps: 0, done: false })),
+        };
+      }),
+    };
+    setActiveWorkout(key);
+    setActiveSession(session);
+    setView('active-workout');
+  };
+
+  const updateSet = (exIdx, setIdx, field, value) => {
+    const updated = { ...activeSession };
+    updated.exercises[exIdx].sets[setIdx][field] = value;
+    setActiveSession(updated);
+  };
+
+  const toggleSetDone = (exIdx, setIdx) => {
+    const updated = { ...activeSession };
+    updated.exercises[exIdx].sets[setIdx].done = !updated.exercises[exIdx].sets[setIdx].done;
+    setActiveSession(updated);
+  };
+
+  const finishWorkout = async () => {
+    const record = {
+      id: `workout_${Date.now()}`,
+      timestamp: Date.now(),
+      date: selectedDate,
+      workout: activeWorkout,
+      exercises: activeSession.exercises.map(ex => ({
+        id: ex.id,
+        name: ex.name,
+        sets: ex.sets.filter(s => s.done || s.reps > 0).map(s => ({ weight: s.weight, reps: s.reps })),
+      })),
+    };
+    try {
+      await storage.set(`workout:${record.id}`, JSON.stringify(record));
+      setWorkoutLogs([record, ...workoutLogs]);
+      setActiveSession(null);
+      setActiveWorkout(null);
+      setView('home');
+    } catch (e) {
+      alert('Save failed: ' + e.message);
+    }
+  };
+
+  // Recipe handlers
+  const saveRecipe = async (recipeData) => {
+    const id = recipeData.id || `recipe_${Date.now()}`;
+    const existing = recipes.find(r => r.id === id);
+    const record = {
+      ...recipeData,
+      id,
+      timestamp: existing?.timestamp || Date.now(),
+      uses: existing?.uses || 0,
+      favorite: existing?.favorite || false,
+    };
+    await storage.set(`recipe:${id}`, JSON.stringify(record));
+    const updated = existing
+      ? recipes.map(r => r.id === id ? record : r)
+      : [...recipes, record];
+    setRecipes(updated.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.uses - a.uses));
+  };
+
+  const deleteRecipe = async (id) => {
+    await storage.delete(`recipe:${id}`);
+    setRecipes(recipes.filter(r => r.id !== id));
+  };
+
+  const toggleRecipeFavorite = async (id) => {
+    const recipe = recipes.find(r => r.id === id);
+    if (!recipe) return;
+    const updated = { ...recipe, favorite: !recipe.favorite };
+    await storage.set(`recipe:${id}`, JSON.stringify(updated));
+    setRecipes(recipes.map(r => r.id === id ? updated : r)
+      .sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.uses - a.uses));
+  };
+
+  const useRecipe = async (recipe) => {
+    // Increment use count
+    const updated = { ...recipe, uses: (recipe.uses || 0) + 1 };
+    await storage.set(`recipe:${recipe.id}`, JSON.stringify(updated));
+    setRecipes(recipes.map(r => r.id === recipe.id ? updated : r));
+    // Log as a meal
+    const mealRecord = {
+      id: `meal_${Date.now()}`,
+      timestamp: Date.now(),
+      date: selectedDate,
+      name: recipe.name,
+      calories: recipe.calories,
+      protein: recipe.protein,
+      mealType: recipe.mealType,
+      fromRecipe: recipe.id,
+    };
+    await storage.set(`meal:${mealRecord.id}`, JSON.stringify(mealRecord));
+    setMealLogs([mealRecord, ...mealLogs]);
+    setView('home');
+  };
+
+  // Route handlers
+  const saveRoute = async (routeData) => {
+    const id = routeData.id || `route_${Date.now()}`;
+    const existing = routes.find(r => r.id === id);
+    const record = {
+      ...routeData,
+      id,
+      timestamp: existing?.timestamp || Date.now(),
+      uses: existing?.uses || 0,
+      favorite: existing?.favorite || false,
+    };
+    await storage.set(`route:${id}`, JSON.stringify(record));
+    const updated = existing
+      ? routes.map(r => r.id === id ? record : r)
+      : [...routes, record];
+    setRoutes(updated.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.uses - a.uses));
+  };
+
+  const deleteRoute = async (id) => {
+    await storage.delete(`route:${id}`);
+    setRoutes(routes.filter(r => r.id !== id));
+  };
+
+  const toggleRouteFavorite = async (id) => {
+    const route = routes.find(r => r.id === id);
+    if (!route) return;
+    const updated = { ...route, favorite: !route.favorite };
+    await storage.set(`route:${id}`, JSON.stringify(updated));
+    setRoutes(routes.map(r => r.id === id ? updated : r)
+      .sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.uses - a.uses));
+  };
+
+  const useRoute = async (route) => {
+    // Increment use count
+    const updated = { ...route, uses: (route.uses || 0) + 1 };
+    await storage.set(`route:${route.id}`, JSON.stringify(updated));
+    setRoutes(routes.map(r => r.id === route.id ? updated : r));
+    // Log as walk
+    const walkRecord = {
+      id: `walk_${Date.now()}`,
+      timestamp: Date.now(),
+      date: selectedDate,
+      miles: route.miles,
+      minutes: route.minutes,
+      steps: Math.round(route.miles * STEPS_PER_MILE),
+      inputMode: 'miles',
+      fromRoute: route.id,
+      routeName: route.name,
+    };
+    await storage.set(`walk:${walkRecord.id}`, JSON.stringify(walkRecord));
+    setWalkLogs([walkRecord, ...walkLogs]);
+    setView('home');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-stone-950 flex items-center justify-center text-stone-400" style={{ fontFamily: 'Georgia, serif' }}>
+        <div className="text-sm tracking-widest uppercase">Loading</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-stone-950 text-stone-100 pb-24" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        .display { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .grain { background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0); background-size: 4px 4px; }
+      `}</style>
+
+      {view === 'home' && (
+        <HomeView
+          workoutLogs={workoutLogs}
+          walkLogs={walkLogs}
+          weighIns={weighIns}
+          mealLogs={mealLogs}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          onStartWorkout={startWorkout}
+          onNavigate={setView}
+        />
+      )}
+      {view === 'active-workout' && activeSession && (
+        <ActiveWorkoutView
+          session={activeSession}
+          workoutKey={activeWorkout}
+          selectedDate={selectedDate}
+          onUpdateSet={updateSet}
+          onToggleDone={toggleSetDone}
+          onFinish={finishWorkout}
+          onCancel={() => { setActiveSession(null); setView('home'); }}
+        />
+      )}
+      {view === 'walk' && (
+        <WalkView
+          walkLogs={walkLogs}
+          routes={routes}
+          selectedDate={selectedDate}
+          onSave={async (walk) => {
+            const record = { id: `walk_${Date.now()}`, timestamp: Date.now(), date: selectedDate, ...walk };
+            await storage.set(`walk:${record.id}`, JSON.stringify(record));
+            setWalkLogs([record, ...walkLogs]);
+            setView('home');
+          }}
+          onUseRoute={useRoute}
+          onManageRoutes={() => setView('routes')}
+          onBack={() => setView('home')}
+        />
+      )}
+      {view === 'weigh' && (
+        <WeighView
+          weighIns={weighIns}
+          selectedDate={selectedDate}
+          onSave={async (weight) => {
+            const record = { id: `weigh_${Date.now()}`, timestamp: Date.now(), date: selectedDate, weight };
+            await storage.set(`weigh:${record.id}`, JSON.stringify(record));
+            setWeighIns([record, ...weighIns]);
+            setView('home');
+          }}
+          onBack={() => setView('home')}
+        />
+      )}
+      {view === 'meal' && (
+        <MealView
+          mealLogs={mealLogs}
+          recipes={recipes}
+          selectedDate={selectedDate}
+          onSave={async (meal) => {
+            const record = { id: `meal_${Date.now()}`, timestamp: Date.now(), date: selectedDate, ...meal };
+            await storage.set(`meal:${record.id}`, JSON.stringify(record));
+            setMealLogs([record, ...mealLogs]);
+            setView('home');
+          }}
+          onUseRecipe={useRecipe}
+          onManageRecipes={() => setView('recipes')}
+          onBack={() => setView('home')}
+        />
+      )}
+      {view === 'recipes' && (
+        <RecipesView
+          recipes={recipes}
+          onSave={saveRecipe}
+          onDelete={deleteRecipe}
+          onToggleFavorite={toggleRecipeFavorite}
+          onBack={() => setView('meal')}
+        />
+      )}
+      {view === 'routes' && (
+        <RoutesView
+          routes={routes}
+          onSave={saveRoute}
+          onDelete={deleteRoute}
+          onToggleFavorite={toggleRouteFavorite}
+          onBack={() => setView('walk')}
+        />
+      )}
+      {view === 'progress' && (
+        <ProgressView
+          workoutLogs={workoutLogs}
+          walkLogs={walkLogs}
+          weighIns={weighIns}
+          mealLogs={mealLogs}
+          onBack={() => setView('home')}
+        />
+      )}
+    </div>
+  );
+}
+
+function HomeView({ workoutLogs, walkLogs, weighIns, mealLogs, selectedDate, onSelectDate, onStartWorkout, onNavigate }) {
+  const today = todayStr();
+  const isToday = selectedDate === today;
+  const isFuture = selectedDate > today;
+  const dayMeals = mealLogs.filter(m => m.date === selectedDate);
+  const dayCals = dayMeals.reduce((sum, m) => sum + (m.calories || 0), 0);
+  const dayProtein = dayMeals.reduce((sum, m) => sum + (m.protein || 0), 0);
+  const dayWalk = walkLogs.find(w => w.date === selectedDate);
+  const dayWeight = weighIns.find(w => w.date === selectedDate);
+  const dayWorkout = workoutLogs.find(w => w.date === selectedDate);
+  const latestWeight = weighIns[0];
+
+  // Figure out which workout is next (alternate)
+  const lastWorkout = workoutLogs[0];
+  const nextWorkoutKey = lastWorkout?.workout === 'A' ? 'B' : 'A';
+
+  // Streak: consecutive days with any activity
+  const calcStreak = () => {
+    const allDates = new Set([
+      ...workoutLogs.map(w => w.date),
+      ...walkLogs.map(w => w.date),
+    ]);
+    let streak = 0;
+    const d = new Date();
+    while (allDates.has(d.toISOString().split('T')[0])) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    }
+    return streak;
+  };
+  const streak = calcStreak();
+
+  return (
+    <div className="px-6 pt-10">
+      {/* Date navigator */}
+      <div className="flex items-center justify-between mb-6 border border-stone-800 bg-stone-900/30">
+        <button
+          onClick={() => onSelectDate(dateStrOffset(selectedDate, -1))}
+          className="p-3 text-stone-400 hover:bg-stone-900"
+          aria-label="Previous day"
+        >
+          <ChevronRight className="w-4 h-4 rotate-180" />
+        </button>
+        <button
+          onClick={() => onSelectDate(today)}
+          className="flex-1 text-center py-3"
+        >
+          <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase">
+            {isToday ? 'Today' : humanDate(selectedDate)}
+          </div>
+          {!isToday && (
+            <div className="mono text-[10px] text-amber-600 mt-1 tracking-wider uppercase">Tap to return to today</div>
+          )}
+        </button>
+        <button
+          onClick={() => onSelectDate(dateStrOffset(selectedDate, 1))}
+          disabled={isToday}
+          className="p-3 text-stone-400 hover:bg-stone-900 disabled:text-stone-700 disabled:hover:bg-transparent"
+          aria-label="Next day"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="mb-10">
+        <h1 className="display text-5xl text-stone-100 leading-none">
+          {isToday ? <>Ready to <em>work</em>.</> : isFuture ? <>Plan <em>ahead</em>.</> : <>Catch <em>up</em>.</>}
+        </h1>
+      </div>
+
+      {/* Today's snapshot — now reflects selected date */}
+      <div className="grid grid-cols-2 gap-3 mb-8">
+        <StatCard label="Streak" value={streak} unit={streak === 1 ? 'day' : 'days'} icon={<Flame className="w-4 h-4" />} />
+        <StatCard
+          label={dayWeight ? 'Weight (this day)' : 'Latest weight'}
+          value={dayWeight ? dayWeight.weight : (latestWeight ? latestWeight.weight : '—')}
+          unit={dayWeight || latestWeight ? 'lbs' : ''}
+          icon={<Scale className="w-4 h-4" />}
+        />
+        <StatCard label="Calories" value={dayCals || '—'} unit={dayCals ? `/ ${DAILY_CAL_TARGET}` : ''} icon={<Utensils className="w-4 h-4" />} />
+        <StatCard label="Protein" value={dayProtein || '—'} unit={dayProtein ? `g / ${DAILY_PROTEIN_TARGET}g` : ''} icon={<Target className="w-4 h-4" />} />
+      </div>
+
+      {/* Next workout (only show on today/future) */}
+      {isToday && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase">Next session</div>
+            <div className="flex gap-1 items-center">
+              <span className="mono text-[10px] text-stone-600 tracking-wider uppercase mr-1">Start:</span>
+              <button
+                onClick={() => onStartWorkout('A')}
+                className={`mono text-xs tracking-wider uppercase px-3 py-1 border ${nextWorkoutKey === 'A' ? 'border-amber-600 text-amber-400 bg-amber-950/30' : 'border-stone-700 text-stone-400 hover:text-stone-100'}`}
+              >
+                A
+              </button>
+              <button
+                onClick={() => onStartWorkout('B')}
+                className={`mono text-xs tracking-wider uppercase px-3 py-1 border ${nextWorkoutKey === 'B' ? 'border-amber-600 text-amber-400 bg-amber-950/30' : 'border-stone-700 text-stone-400 hover:text-stone-100'}`}
+              >
+                B
+              </button>
+            </div>
+          </div>
+          <button
+            onClick={() => onStartWorkout(nextWorkoutKey)}
+            className="w-full bg-stone-100 text-stone-950 rounded-none p-6 text-left hover:bg-amber-50 transition-colors group border-l-4 border-amber-600"
+          >
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <div className="display text-4xl leading-none">{WORKOUTS[nextWorkoutKey].name}</div>
+                <div className="mono text-xs text-stone-600 mt-2 tracking-wider uppercase">{WORKOUTS[nextWorkoutKey].focus} · suggested</div>
+              </div>
+              <ChevronRight className="w-6 h-6 mt-1 group-hover:translate-x-1 transition-transform" />
+            </div>
+            <div className="mt-4 pt-4 border-t border-stone-300 text-sm italic text-stone-700">
+              "{WORKOUTS[nextWorkoutKey].cue}"
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* Show what was done on a past day */}
+      {!isToday && dayWorkout && (
+        <div className="mb-6 border border-stone-800 p-5">
+          <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase mb-2">Logged this day</div>
+          <div className="display text-3xl">Workout {dayWorkout.workout}</div>
+          <div className="mono text-xs text-stone-500 mt-2">
+            {dayWorkout.exercises.reduce((s, e) => s + e.sets.length, 0)} sets across {dayWorkout.exercises.length} exercises
+          </div>
+        </div>
+      )}
+
+      {/* Quick actions */}
+      <div className="mb-6">
+        <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase mb-3">
+          Log {isToday ? 'for today' : `for ${humanDate(selectedDate).toLowerCase()}`}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <QuickButton icon={<Footprints className="w-5 h-5" />} label="Walk" active={!!dayWalk} onClick={() => onNavigate('walk')} />
+          <QuickButton icon={<Scale className="w-5 h-5" />} label="Weigh" active={!!dayWeight} onClick={() => onNavigate('weigh')} />
+          <QuickButton icon={<Utensils className="w-5 h-5" />} label="Meal" active={dayMeals.length > 0} onClick={() => onNavigate('meal')} />
+        </div>
+        {dayWalk && (
+          <div className="mt-3 mono text-xs text-emerald-600 tracking-wider uppercase">
+            ✓ {dayWalk.miles} mi logged{dayWalk.steps ? ` (${dayWalk.steps.toLocaleString()} steps)` : ''}
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={() => onNavigate('progress')}
+        className="w-full border border-stone-800 text-stone-300 p-4 mt-4 flex items-center justify-between hover:bg-stone-900 transition-colors"
+      >
+        <span className="flex items-center gap-3">
+          <TrendingUp className="w-5 h-5" />
+          <span className="tracking-wide">Progress & History</span>
+        </span>
+        <ChevronRight className="w-5 h-5" />
+      </button>
+
+      {/* Recent activity preview */}
+      {(workoutLogs.length > 0 || walkLogs.length > 0) && (
+        <div className="mt-10">
+          <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase mb-3">Recent</div>
+          <div className="space-y-2">
+            {[...workoutLogs.slice(0, 2).map(w => ({ type: 'workout', ...w })),
+              ...walkLogs.slice(0, 2).map(w => ({ type: 'walk', ...w }))]
+              .sort((a, b) => b.timestamp - a.timestamp)
+              .slice(0, 4)
+              .map(item => (
+                <div key={item.id} className="flex items-center gap-3 py-2 border-b border-stone-900 text-sm">
+                  {item.type === 'workout' ? <Dumbbell className="w-4 h-4 text-amber-600" /> : <Footprints className="w-4 h-4 text-emerald-600" />}
+                  <div className="flex-1">
+                    {item.type === 'workout'
+                      ? `Workout ${item.workout} · ${item.exercises.reduce((s, e) => s + e.sets.length, 0)} sets`
+                      : `${item.miles} mi walk · ${item.minutes} min`}
+                  </div>
+                  <div className="mono text-xs text-stone-600">{formatDate(item.date)}</div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* Backup footer */}
+      <div className="mt-12 pt-6 border-t border-stone-900 space-y-2">
+        <div className="mono text-[10px] text-stone-600 tracking-[0.2em] uppercase text-center mb-2">Backup</div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={async () => {
+              const all = {};
+              const keys = await storage.list('');
+              for (const k of keys.keys) {
+                const r = await storage.get(k);
+                if (r) all[k] = JSON.parse(r.value);
+              }
+              const exportObj = { version: 1, exportedAt: new Date().toISOString(), data: all };
+              const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `tracker_backup_${todayStr()}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="border border-stone-800 text-stone-400 mono text-xs tracking-wider uppercase py-3 hover:bg-stone-900 hover:text-stone-200 transition-colors"
+          >
+            Export
+          </button>
+          <button
+            onClick={() => {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = 'application/json,.json';
+              input.onchange = async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                try {
+                  const text = await file.text();
+                  const parsed = JSON.parse(text);
+                  // Accept both wrapped {version, data} and bare {key: value} formats
+                  const data = parsed.data || parsed;
+                  const keyCount = Object.keys(data).length;
+                  if (!keyCount) {
+                    alert('That file looks empty.');
+                    return;
+                  }
+                  if (!confirm(`Import ${keyCount} entries? This will overwrite any existing entries with the same keys.`)) return;
+                  for (const [key, value] of Object.entries(data)) {
+                    await storage.set(key, JSON.stringify(value));
+                  }
+                  alert(`Imported ${keyCount} entries. Reloading...`);
+                  window.location.reload();
+                } catch (err) {
+                  alert('Could not read that file: ' + err.message);
+                }
+              };
+              input.click();
+            }}
+            className="border border-stone-800 text-stone-400 mono text-xs tracking-wider uppercase py-3 hover:bg-stone-900 hover:text-stone-200 transition-colors"
+          >
+            Import
+          </button>
+        </div>
+        <div className="mono text-[10px] text-stone-700 tracking-wider text-center pt-2">
+          Data lives in this browser only. Export regularly.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, unit, icon }) {
+  return (
+    <div className="border border-stone-800 p-4 bg-stone-900/30 grain">
+      <div className="flex items-center gap-2 text-stone-500 mb-2">
+        {icon}
+        <span className="mono text-xs tracking-wider uppercase">{label}</span>
+      </div>
+      <div className="display text-3xl text-stone-100 leading-none">
+        {value}
+        {unit && <span className="mono text-xs text-stone-500 ml-1">{unit}</span>}
+      </div>
+    </div>
+  );
+}
+
+function QuickButton({ icon, label, onClick, active }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`border p-4 flex flex-col items-center gap-2 transition-colors ${
+        active ? 'border-emerald-700 bg-emerald-950/40 text-emerald-300' : 'border-stone-800 text-stone-300 hover:bg-stone-900'
+      }`}
+    >
+      {icon}
+      <span className="mono text-xs tracking-wider uppercase">{label}</span>
+      {active && <Check className="w-3 h-3" />}
+    </button>
+  );
+}
+
+function ActiveWorkoutView({ session, workoutKey, selectedDate, onUpdateSet, onToggleDone, onFinish, onCancel }) {
+  const workout = WORKOUTS[workoutKey];
+  const totalSets = session.exercises.reduce((s, e) => s + e.sets.length, 0);
+  // A set counts as "done" if either the user tapped the checkmark OR they entered reps
+  const isSetComplete = (set) => set.done || set.reps > 0;
+  const doneSets = session.exercises.reduce((s, e) => s + e.sets.filter(isSetComplete).length, 0);
+  const isBackdated = selectedDate !== todayStr();
+
+  return (
+    <div className="px-6 pt-8">
+      <button onClick={onCancel} className="mono text-xs text-stone-500 tracking-wider uppercase mb-4 flex items-center gap-2 hover:text-stone-300">
+        <X className="w-3 h-3" /> Cancel
+      </button>
+      <div className="mb-6">
+        <div className="mono text-xs text-amber-600 tracking-[0.2em] uppercase mb-2">
+          In session · <span className={isBackdated ? 'text-amber-400' : ''}>{humanDate(selectedDate)}</span>
+        </div>
+        <h1 className="display text-5xl leading-none mb-2">{workout.name}</h1>
+        <div className="mono text-xs text-stone-500 tracking-wider uppercase mb-4">{workout.focus}</div>
+        <div className="border-l-2 border-amber-600 pl-4 text-sm italic text-stone-300">
+          {workout.cue}
+        </div>
+      </div>
+
+      <div className="mb-4 flex items-center justify-between mono text-xs text-stone-500">
+        <span>{doneSets} / {totalSets} sets complete</span>
+        <span>{Math.round((doneSets / totalSets) * 100)}%</span>
+      </div>
+      <div className="h-1 bg-stone-900 mb-8">
+        <div className="h-full bg-amber-600 transition-all" style={{ width: `${(doneSets / totalSets) * 100}%` }} />
+      </div>
+
+      <div className="space-y-8">
+        {session.exercises.map((ex, exIdx) => (
+          <div key={ex.id} className="border-t border-stone-800 pt-6">
+            <div className="flex items-start justify-between mb-1">
+              <h3 className="display text-2xl">{ex.name}</h3>
+              <div className="mono text-xs text-stone-500 tracking-wider uppercase mt-2">
+                {ex.repRange[0]}–{ex.repRange[1]} reps
+              </div>
+            </div>
+            <div className="mono text-xs text-amber-700 mb-4 tracking-wider uppercase">
+              {ex.suggestedNote}
+            </div>
+            <div className="space-y-2">
+              {ex.sets.map((set, setIdx) => (
+                <SetRow
+                  key={setIdx}
+                  set={set}
+                  setNum={setIdx + 1}
+                  onUpdate={(field, value) => onUpdateSet(exIdx, setIdx, field, value)}
+                  onToggleDone={() => onToggleDone(exIdx, setIdx)}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={onFinish}
+        disabled={doneSets === 0}
+        className="w-full mt-10 bg-amber-600 text-stone-950 p-5 display text-2xl hover:bg-amber-500 disabled:bg-stone-800 disabled:text-stone-600 transition-colors"
+      >
+        Finish & Save
+      </button>
+    </div>
+  );
+}
+
+function SetRow({ set, setNum, onUpdate, onToggleDone }) {
+  const isComplete = set.done || set.reps > 0;
+  return (
+    <div className={`flex items-center gap-3 p-3 border ${isComplete ? 'border-emerald-800 bg-emerald-950/30' : 'border-stone-800'}`}>
+      <div className="mono text-xs text-stone-500 w-8">SET {setNum}</div>
+      <div className="flex items-center gap-1">
+        <button onClick={() => onUpdate('weight', Math.max(0, set.weight - 5))} className="w-8 h-8 border border-stone-700 text-stone-400 hover:bg-stone-800">
+          <Minus className="w-3 h-3 mx-auto" />
+        </button>
+        <input
+          type="number"
+          value={set.weight}
+          onChange={(e) => onUpdate('weight', parseInt(e.target.value) || 0)}
+          className="w-16 bg-transparent border border-stone-700 text-center py-1 mono"
+        />
+        <button onClick={() => onUpdate('weight', set.weight + 5)} className="w-8 h-8 border border-stone-700 text-stone-400 hover:bg-stone-800">
+          <Plus className="w-3 h-3 mx-auto" />
+        </button>
+      </div>
+      <div className="mono text-xs text-stone-600">lb</div>
+      <div className="flex items-center gap-1 flex-1 justify-end">
+        <button onClick={() => onUpdate('reps', Math.max(0, set.reps - 1))} className="w-8 h-8 border border-stone-700 text-stone-400 hover:bg-stone-800">
+          <Minus className="w-3 h-3 mx-auto" />
+        </button>
+        <input
+          type="number"
+          value={set.reps}
+          onChange={(e) => onUpdate('reps', parseInt(e.target.value) || 0)}
+          className="w-12 bg-transparent border border-stone-700 text-center py-1 mono"
+        />
+        <button onClick={() => onUpdate('reps', set.reps + 1)} className="w-8 h-8 border border-stone-700 text-stone-400 hover:bg-stone-800">
+          <Plus className="w-3 h-3 mx-auto" />
+        </button>
+        <div className="mono text-xs text-stone-600 ml-1 w-8">reps</div>
+      </div>
+      <button
+        onClick={onToggleDone}
+        className={`w-10 h-10 border flex items-center justify-center ${isComplete ? 'bg-emerald-600 border-emerald-600 text-stone-950' : 'border-stone-700 text-stone-500 hover:border-stone-500'}`}
+      >
+        <Check className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+function WalkView({ walkLogs, routes, selectedDate, onSave, onUseRoute, onManageRoutes, onBack }) {
+  const [inputMode, setInputMode] = useState('miles'); // 'miles' or 'steps'
+  const [miles, setMiles] = useState('3');
+  const [steps, setSteps] = useState('7200');
+  const [minutes, setMinutes] = useState('60');
+
+  // Compute the miles value that will be saved
+  const computedMiles = inputMode === 'miles'
+    ? parseFloat(miles) || 0
+    : (parseFloat(steps) || 0) / STEPS_PER_MILE;
+
+  const computedSteps = inputMode === 'steps'
+    ? parseInt(steps) || 0
+    : Math.round((parseFloat(miles) || 0) * STEPS_PER_MILE);
+
+  const isBackdated = selectedDate !== todayStr();
+  const topRoutes = routes.slice(0, 4);
+
+  return (
+    <div className="px-6 pt-8">
+      <button onClick={onBack} className="mono text-xs text-stone-500 tracking-wider uppercase mb-4 hover:text-stone-300">← Back</button>
+      <div className={`mono text-xs tracking-[0.2em] uppercase mb-2 ${isBackdated ? 'text-amber-500' : 'text-stone-500'}`}>
+        {humanDate(selectedDate)}
+      </div>
+      <h1 className="display text-5xl mb-8">Log a walk.</h1>
+
+      {/* Saved routes quick-pick */}
+      {topRoutes.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase">Your routes</div>
+            <button onClick={onManageRoutes} className="mono text-xs text-amber-600 tracking-wider uppercase hover:text-amber-400">
+              Manage
+            </button>
+          </div>
+          <div className="space-y-2">
+            {topRoutes.map(route => (
+              <button
+                key={route.id}
+                onClick={() => onUseRoute(route)}
+                className="w-full border border-stone-800 hover:border-emerald-700 hover:bg-emerald-950/20 p-4 text-left flex items-center gap-3 transition-colors"
+              >
+                <MapPin className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-stone-100">{route.name}</span>
+                    {route.favorite && <Star className="w-3 h-3 fill-amber-500 text-amber-500" />}
+                  </div>
+                  <div className="mono text-xs text-stone-500 mt-1">
+                    {route.miles} mi · {route.minutes} min{route.uses > 0 ? ` · walked ${route.uses}×` : ''}
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-stone-600" />
+              </button>
+            ))}
+          </div>
+          <div className="mono text-xs text-stone-600 tracking-wider uppercase mt-4 text-center">— or enter manually —</div>
+        </div>
+      )}
+
+      {/* Input mode toggle */}
+      <div className="grid grid-cols-2 gap-2 mb-6">
+        <button
+          onClick={() => setInputMode('miles')}
+          className={`border py-3 mono text-xs tracking-wider uppercase ${inputMode === 'miles' ? 'border-amber-600 bg-amber-950/40 text-amber-300' : 'border-stone-800 text-stone-500'}`}
+        >
+          Enter miles
+        </button>
+        <button
+          onClick={() => setInputMode('steps')}
+          className={`border py-3 mono text-xs tracking-wider uppercase ${inputMode === 'steps' ? 'border-amber-600 bg-amber-950/40 text-amber-300' : 'border-stone-800 text-stone-500'}`}
+        >
+          Enter steps
+        </button>
+      </div>
+
+      <div className="space-y-6">
+        {inputMode === 'miles' ? (
+          <Field label="Miles">
+            <input
+              type="number"
+              step="0.1"
+              value={miles}
+              onChange={(e) => setMiles(e.target.value)}
+              className="w-full bg-transparent border-b border-stone-700 text-4xl display py-3 focus:border-amber-600 outline-none"
+            />
+            <div className="mono text-xs text-stone-500 mt-2 tracking-wider uppercase">
+              ≈ {computedSteps.toLocaleString()} steps
+            </div>
+          </Field>
+        ) : (
+          <Field label="Steps">
+            <input
+              type="number"
+              step="100"
+              value={steps}
+              onChange={(e) => setSteps(e.target.value)}
+              className="w-full bg-transparent border-b border-stone-700 text-4xl display py-3 focus:border-amber-600 outline-none"
+            />
+            <div className="mono text-xs text-stone-500 mt-2 tracking-wider uppercase">
+              ≈ {computedMiles.toFixed(2)} miles <span className="text-stone-700">· based on 2,400 steps/mile</span>
+            </div>
+          </Field>
+        )}
+        <Field label="Minutes">
+          <input
+            type="number"
+            value={minutes}
+            onChange={(e) => setMinutes(e.target.value)}
+            className="w-full bg-transparent border-b border-stone-700 text-4xl display py-3 focus:border-amber-600 outline-none"
+          />
+        </Field>
+        <div className="mono text-xs text-stone-500 pt-2">
+          Pace: {minutes && computedMiles ? (parseFloat(minutes) / computedMiles).toFixed(1) : '—'} min/mile · Est. {Math.round(computedMiles * 110)} cal
+        </div>
+      </div>
+      <button
+        onClick={() => onSave({
+          miles: parseFloat(computedMiles.toFixed(2)),
+          steps: computedSteps,
+          minutes: parseInt(minutes),
+          inputMode,
+        })}
+        disabled={!computedMiles || !minutes}
+        className="w-full mt-10 bg-emerald-700 text-stone-100 p-5 display text-2xl hover:bg-emerald-600 disabled:bg-stone-800 disabled:text-stone-600 transition-colors"
+      >
+        Save Walk
+      </button>
+    </div>
+  );
+}
+
+function WeighView({ weighIns, selectedDate, onSave, onBack }) {
+  const existingForDate = weighIns.find(w => w.date === selectedDate);
+  const [weight, setWeight] = useState(existingForDate?.weight || weighIns[0]?.weight || 213);
+  const delta = weighIns[0] && !existingForDate ? (parseFloat(weight) - weighIns[0].weight).toFixed(1) : null;
+  const isBackdated = selectedDate !== todayStr();
+
+  return (
+    <div className="px-6 pt-8">
+      <button onClick={onBack} className="mono text-xs text-stone-500 tracking-wider uppercase mb-4 hover:text-stone-300">← Back</button>
+      <div className={`mono text-xs tracking-[0.2em] uppercase mb-2 ${isBackdated ? 'text-amber-500' : 'text-stone-500'}`}>
+        {humanDate(selectedDate)}
+      </div>
+      <h1 className="display text-5xl mb-8">Weigh in.</h1>
+      {existingForDate && (
+        <div className="mono text-xs text-amber-600 tracking-wider uppercase mb-4">
+          Replacing existing entry for this day
+        </div>
+      )}
+      <Field label="Weight">
+        <input
+          type="number"
+          step="0.1"
+          value={weight}
+          onChange={(e) => setWeight(e.target.value)}
+          className="w-full bg-transparent border-b border-stone-700 text-6xl display py-3 focus:border-amber-600 outline-none"
+        />
+      </Field>
+      {delta !== null && (
+        <div className={`mono text-xs mt-3 tracking-wider uppercase ${parseFloat(delta) < 0 ? 'text-emerald-500' : parseFloat(delta) > 0 ? 'text-amber-600' : 'text-stone-500'}`}>
+          {parseFloat(delta) > 0 ? '+' : ''}{delta} lb vs last weigh-in
+        </div>
+      )}
+      <button
+        onClick={() => onSave(parseFloat(weight))}
+        className="w-full mt-10 bg-stone-100 text-stone-950 p-5 display text-2xl hover:bg-stone-200 transition-colors"
+      >
+        Save
+      </button>
+    </div>
+  );
+}
+
+function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onManageRecipes, onBack }) {
+  const [name, setName] = useState('');
+  const [calories, setCalories] = useState('');
+  const [protein, setProtein] = useState('');
+  const [mealType, setMealType] = useState('lunch');
+  const [recipeFilter, setRecipeFilter] = useState('all');
+
+  const dayMeals = mealLogs.filter(m => m.date === selectedDate);
+  const dayCals = dayMeals.reduce((s, m) => s + (m.calories || 0), 0);
+  const dayProtein = dayMeals.reduce((s, m) => s + (m.protein || 0), 0);
+  const isBackdated = selectedDate !== todayStr();
+
+  const filteredRecipes = recipeFilter === 'all'
+    ? recipes
+    : recipes.filter(r => r.mealType === recipeFilter);
+  const topRecipes = filteredRecipes.slice(0, 6);
+
+  return (
+    <div className="px-6 pt-8">
+      <button onClick={onBack} className="mono text-xs text-stone-500 tracking-wider uppercase mb-4 hover:text-stone-300">← Back</button>
+      <div className={`mono text-xs tracking-[0.2em] uppercase mb-2 ${isBackdated ? 'text-amber-500' : 'text-stone-500'}`}>
+        {humanDate(selectedDate)}
+      </div>
+      <h1 className="display text-5xl mb-2">Log a meal.</h1>
+      <div className="mono text-xs text-stone-500 tracking-wider uppercase mb-8">
+        This day so far: {dayCals} cal · {dayProtein}g protein
+      </div>
+
+      {/* Recipe quick-pick */}
+      {recipes.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase">Your recipes</div>
+            <button onClick={onManageRecipes} className="mono text-xs text-amber-600 tracking-wider uppercase hover:text-amber-400">
+              Manage
+            </button>
+          </div>
+          <div className="flex gap-2 mb-3">
+            {['all', 'lunch', 'dinner', 'snack'].map(f => (
+              <button
+                key={f}
+                onClick={() => setRecipeFilter(f)}
+                className={`mono text-xs tracking-wider uppercase px-2 py-1 border ${recipeFilter === f ? 'border-amber-600 text-amber-400' : 'border-stone-800 text-stone-500'}`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+          <div className="space-y-2">
+            {topRecipes.map(recipe => (
+              <button
+                key={recipe.id}
+                onClick={() => onUseRecipe(recipe)}
+                className="w-full border border-stone-800 hover:border-amber-600 hover:bg-amber-950/20 p-4 text-left flex items-start gap-3 transition-colors"
+              >
+                <BookOpen className="w-4 h-4 text-amber-600 flex-shrink-0 mt-1" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-stone-100 truncate">{recipe.name}</span>
+                    {recipe.favorite && <Star className="w-3 h-3 fill-amber-500 text-amber-500 flex-shrink-0" />}
+                  </div>
+                  <div className="mono text-xs text-stone-500 mt-1">
+                    {recipe.calories} cal · {recipe.protein}g protein · {recipe.mealType}
+                    {recipe.uses > 0 ? ` · ${recipe.uses}×` : ''}
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-stone-600 flex-shrink-0 mt-1" />
+              </button>
+            ))}
+          </div>
+          <div className="mono text-xs text-stone-600 tracking-wider uppercase mt-4 text-center">— or enter manually —</div>
+        </div>
+      )}
+
+      <div className="space-y-6">
+        <div>
+          <label className="mono text-xs text-stone-500 tracking-wider uppercase mb-2 block">Meal</label>
+          <div className="grid grid-cols-3 gap-2">
+            {['lunch', 'dinner', 'snack'].map(type => (
+              <button
+                key={type}
+                onClick={() => setMealType(type)}
+                className={`border py-3 mono text-xs tracking-wider uppercase ${mealType === type ? 'border-amber-600 bg-amber-950/40 text-amber-300' : 'border-stone-800 text-stone-500'}`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Field label="What did you eat?">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. grilled chicken, salad, sweet potato"
+            className="w-full bg-transparent border-b border-stone-700 text-xl py-3 focus:border-amber-600 outline-none placeholder:text-stone-700"
+          />
+        </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Calories">
+            <input
+              type="number"
+              value={calories}
+              onChange={(e) => setCalories(e.target.value)}
+              className="w-full bg-transparent border-b border-stone-700 text-3xl display py-3 focus:border-amber-600 outline-none"
+            />
+          </Field>
+          <Field label="Protein (g)">
+            <input
+              type="number"
+              value={protein}
+              onChange={(e) => setProtein(e.target.value)}
+              className="w-full bg-transparent border-b border-stone-700 text-3xl display py-3 focus:border-amber-600 outline-none"
+            />
+          </Field>
+        </div>
+      </div>
+
+      <button
+        onClick={() => onSave({
+          name,
+          calories: parseInt(calories) || 0,
+          protein: parseInt(protein) || 0,
+          mealType,
+        })}
+        disabled={!name}
+        className="w-full mt-10 bg-amber-600 text-stone-950 p-5 display text-2xl hover:bg-amber-500 disabled:bg-stone-800 disabled:text-stone-600 transition-colors"
+      >
+        Save Meal
+      </button>
+    </div>
+  );
+}
+
+function ProgressView({ workoutLogs, walkLogs, weighIns, mealLogs, onBack }) {
+  const [tab, setTab] = useState('overview');
+
+  // Calculate stats
+  const totalWorkouts = workoutLogs.length;
+  const totalWalkMiles = walkLogs.reduce((s, w) => s + w.miles, 0);
+  const firstWeight = weighIns[weighIns.length - 1];
+  const latestWeight = weighIns[0];
+  const weightChange = firstWeight && latestWeight ? (latestWeight.weight - firstWeight.weight).toFixed(1) : null;
+
+  // Get progression for each exercise
+  const exerciseProgressions = {};
+  [...workoutLogs].reverse().forEach(log => {
+    log.exercises.forEach(ex => {
+      if (!exerciseProgressions[ex.id]) exerciseProgressions[ex.id] = { name: ex.name, sessions: [] };
+      const topSet = ex.sets.reduce((max, s) => s.weight > max.weight ? s : max, { weight: 0, reps: 0 });
+      exerciseProgressions[ex.id].sessions.push({ date: log.date, weight: topSet.weight, reps: topSet.reps });
+    });
+  });
+
+  return (
+    <div className="px-6 pt-8">
+      <button onClick={onBack} className="mono text-xs text-stone-500 tracking-wider uppercase mb-6 hover:text-stone-300">← Back</button>
+      <h1 className="display text-5xl mb-8">Progress.</h1>
+
+      <div className="flex gap-2 mb-8 border-b border-stone-800">
+        {['overview', 'lifts', 'history'].map(t => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`mono text-xs tracking-wider uppercase pb-3 px-2 border-b-2 -mb-px ${tab === t ? 'border-amber-600 text-stone-100' : 'border-transparent text-stone-500'}`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'overview' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Workouts" value={totalWorkouts} unit="" icon={<Dumbbell className="w-4 h-4" />} />
+            <StatCard label="Walk miles" value={totalWalkMiles.toFixed(1)} unit="" icon={<Footprints className="w-4 h-4" />} />
+            <StatCard label="Weigh-ins" value={weighIns.length} unit="" icon={<Scale className="w-4 h-4" />} />
+            <StatCard label="Meals logged" value={mealLogs.length} unit="" icon={<Utensils className="w-4 h-4" />} />
+          </div>
+
+          {weightChange !== null && weighIns.length > 1 && (
+            <div className="border border-stone-800 p-6">
+              <div className="mono text-xs text-stone-500 tracking-wider uppercase mb-2">Weight journey</div>
+              <div className="display text-4xl">
+                {firstWeight.weight} → {latestWeight.weight} <span className="mono text-sm text-stone-500">lb</span>
+              </div>
+              <div className={`mono text-sm mt-2 ${parseFloat(weightChange) < 0 ? 'text-emerald-500' : 'text-amber-600'}`}>
+                {parseFloat(weightChange) > 0 ? '+' : ''}{weightChange} lb over {weighIns.length} weigh-ins
+              </div>
+            </div>
+          )}
+
+          {weighIns.length >= 2 && <WeightChart weighIns={weighIns} />}
+        </div>
+      )}
+
+      {tab === 'lifts' && (
+        <div className="space-y-6">
+          {Object.keys(exerciseProgressions).length === 0 && (
+            <div className="text-stone-500 italic text-sm">No lift data yet. Finish a workout to see progression.</div>
+          )}
+          {Object.entries(exerciseProgressions).map(([id, ex]) => (
+            <div key={id} className="border border-stone-800 p-5">
+              <div className="display text-2xl mb-1">{ex.name}</div>
+              <div className="mono text-xs text-stone-500 tracking-wider uppercase mb-4">{ex.sessions.length} sessions</div>
+              <div className="space-y-1">
+                {ex.sessions.slice(-5).reverse().map((s, i) => (
+                  <div key={i} className="flex justify-between text-sm border-b border-stone-900 py-2">
+                    <span className="mono text-stone-500">{formatDate(s.date)}</span>
+                    <span className="mono">{s.weight} lb × {s.reps}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'history' && (
+        <div className="space-y-3">
+          {[...workoutLogs.map(w => ({ type: 'workout', ...w })),
+            ...walkLogs.map(w => ({ type: 'walk', ...w })),
+            ...weighIns.map(w => ({ type: 'weigh', ...w })),
+            ...mealLogs.map(w => ({ type: 'meal', ...w }))]
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, 50)
+            .map(item => (
+              <div key={item.id} className="flex items-center gap-3 py-3 border-b border-stone-900 text-sm">
+                {item.type === 'workout' && <Dumbbell className="w-4 h-4 text-amber-600" />}
+                {item.type === 'walk' && <Footprints className="w-4 h-4 text-emerald-600" />}
+                {item.type === 'weigh' && <Scale className="w-4 h-4 text-stone-400" />}
+                {item.type === 'meal' && <Utensils className="w-4 h-4 text-rose-500" />}
+                <div className="flex-1">
+                  {item.type === 'workout' && `Workout ${item.workout}`}
+                  {item.type === 'walk' && `${item.miles} mi · ${item.minutes} min${item.steps ? ` · ${item.steps.toLocaleString()} steps` : ''}`}
+                  {item.type === 'weigh' && `${item.weight} lb`}
+                  {item.type === 'meal' && `${item.name || 'Meal'} · ${item.calories} cal`}
+                </div>
+                <div className="mono text-xs text-stone-600">{formatDate(item.date)}</div>
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WeightChart({ weighIns }) {
+  const data = [...weighIns].reverse();
+  const weights = data.map(w => w.weight);
+  const min = Math.min(...weights) - 2;
+  const max = Math.max(...weights) + 2;
+  const range = max - min;
+  const width = 300;
+  const height = 120;
+  const points = data.map((w, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - ((w.weight - min) / range) * height;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <div className="border border-stone-800 p-5">
+      <div className="mono text-xs text-stone-500 tracking-wider uppercase mb-4">Weight trend</div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-32">
+        <polyline points={points} fill="none" stroke="#d97706" strokeWidth="2" />
+        {data.map((w, i) => {
+          const x = (i / (data.length - 1)) * width;
+          const y = height - ((w.weight - min) / range) * height;
+          return <circle key={i} cx={x} cy={y} r="3" fill="#d97706" />;
+        })}
+      </svg>
+      <div className="flex justify-between mono text-xs text-stone-600 mt-2">
+        <span>{formatDate(data[0].date)}</span>
+        <span>{formatDate(data[data.length - 1].date)}</span>
+      </div>
+    </div>
+  );
+}
+
+function RecipesView({ recipes, onSave, onDelete, onToggleFavorite, onBack }) {
+  const [editing, setEditing] = useState(null); // null | 'new' | recipe object
+  const [filter, setFilter] = useState('all');
+
+  const filtered = filter === 'all' ? recipes : recipes.filter(r => r.mealType === filter);
+
+  if (editing) {
+    return (
+      <RecipeEditor
+        recipe={editing === 'new' ? null : editing}
+        onSave={async (r) => { await onSave(r); setEditing(null); }}
+        onCancel={() => setEditing(null)}
+      />
+    );
+  }
+
+  return (
+    <div className="px-6 pt-8">
+      <button onClick={onBack} className="mono text-xs text-stone-500 tracking-wider uppercase mb-4 hover:text-stone-300">← Back</button>
+      <div className="flex items-start justify-between mb-8">
+        <h1 className="display text-5xl">Recipes.</h1>
+        <button
+          onClick={() => setEditing('new')}
+          className="mt-3 border border-amber-600 text-amber-400 p-2 hover:bg-amber-950/40"
+          aria-label="Add recipe"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="flex gap-2 mb-6">
+        {['all', 'lunch', 'dinner', 'snack'].map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`mono text-xs tracking-wider uppercase px-3 py-2 border ${filter === f ? 'border-amber-600 text-amber-400' : 'border-stone-800 text-stone-500'}`}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="text-stone-500 italic text-sm">No recipes yet. Tap + to add one.</div>
+      )}
+
+      <div className="space-y-3">
+        {filtered.map(recipe => (
+          <div key={recipe.id} className="border border-stone-800 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <button
+                onClick={() => setEditing(recipe)}
+                className="flex-1 text-left min-w-0"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-stone-100 text-lg">{recipe.name}</span>
+                </div>
+                <div className="mono text-xs text-stone-500">
+                  {recipe.calories} cal · {recipe.protein}g protein · {recipe.mealType}
+                  {recipe.uses > 0 ? ` · used ${recipe.uses}×` : ''}
+                </div>
+                {recipe.notes && (
+                  <div className="text-xs text-stone-400 mt-2 italic">{recipe.notes}</div>
+                )}
+              </button>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => onToggleFavorite(recipe.id)}
+                  className="p-1 text-stone-500 hover:text-amber-500"
+                  aria-label="Toggle favorite"
+                >
+                  <Star className={`w-4 h-4 ${recipe.favorite ? 'fill-amber-500 text-amber-500' : ''}`} />
+                </button>
+                <button
+                  onClick={() => { if (confirm(`Delete "${recipe.name}"?`)) onDelete(recipe.id); }}
+                  className="p-1 text-stone-600 hover:text-red-500"
+                  aria-label="Delete"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RecipeEditor({ recipe, onSave, onCancel }) {
+  const [name, setName] = useState(recipe?.name || '');
+  const [calories, setCalories] = useState(recipe?.calories?.toString() || '');
+  const [protein, setProtein] = useState(recipe?.protein?.toString() || '');
+  const [mealType, setMealType] = useState(recipe?.mealType || 'lunch');
+  const [notes, setNotes] = useState(recipe?.notes || '');
+
+  return (
+    <div className="px-6 pt-8">
+      <button onClick={onCancel} className="mono text-xs text-stone-500 tracking-wider uppercase mb-4 flex items-center gap-2 hover:text-stone-300">
+        <X className="w-3 h-3" /> Cancel
+      </button>
+      <h1 className="display text-5xl mb-8">{recipe ? 'Edit' : 'New'} recipe.</h1>
+
+      <div className="space-y-6">
+        <Field label="Name">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Grilled salmon bowl"
+            className="w-full bg-transparent border-b border-stone-700 text-xl py-3 focus:border-amber-600 outline-none placeholder:text-stone-700"
+          />
+        </Field>
+
+        <div>
+          <label className="mono text-xs text-stone-500 tracking-wider uppercase mb-2 block">Meal type</label>
+          <div className="grid grid-cols-3 gap-2">
+            {['lunch', 'dinner', 'snack'].map(type => (
+              <button
+                key={type}
+                onClick={() => setMealType(type)}
+                className={`border py-3 mono text-xs tracking-wider uppercase ${mealType === type ? 'border-amber-600 bg-amber-950/40 text-amber-300' : 'border-stone-800 text-stone-500'}`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Calories">
+            <input
+              type="number"
+              value={calories}
+              onChange={(e) => setCalories(e.target.value)}
+              className="w-full bg-transparent border-b border-stone-700 text-3xl display py-3 focus:border-amber-600 outline-none"
+            />
+          </Field>
+          <Field label="Protein (g)">
+            <input
+              type="number"
+              value={protein}
+              onChange={(e) => setProtein(e.target.value)}
+              className="w-full bg-transparent border-b border-stone-700 text-3xl display py-3 focus:border-amber-600 outline-none"
+            />
+          </Field>
+        </div>
+
+        <Field label="Notes (ingredients, prep, etc.)">
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. 8oz salmon, quinoa, broccoli, tahini"
+            rows={4}
+            className="w-full bg-transparent border border-stone-700 p-3 text-sm focus:border-amber-600 outline-none placeholder:text-stone-700 resize-none"
+          />
+        </Field>
+      </div>
+
+      <button
+        onClick={() => onSave({
+          id: recipe?.id,
+          name,
+          calories: parseInt(calories) || 0,
+          protein: parseInt(protein) || 0,
+          mealType,
+          notes,
+        })}
+        disabled={!name}
+        className="w-full mt-10 bg-amber-600 text-stone-950 p-5 display text-2xl hover:bg-amber-500 disabled:bg-stone-800 disabled:text-stone-600 transition-colors"
+      >
+        {recipe ? 'Save Changes' : 'Save Recipe'}
+      </button>
+    </div>
+  );
+}
+
+function RoutesView({ routes, onSave, onDelete, onToggleFavorite, onBack }) {
+  const [editing, setEditing] = useState(null);
+
+  if (editing) {
+    return (
+      <RouteEditor
+        route={editing === 'new' ? null : editing}
+        onSave={async (r) => { await onSave(r); setEditing(null); }}
+        onCancel={() => setEditing(null)}
+      />
+    );
+  }
+
+  return (
+    <div className="px-6 pt-8">
+      <button onClick={onBack} className="mono text-xs text-stone-500 tracking-wider uppercase mb-4 hover:text-stone-300">← Back</button>
+      <div className="flex items-start justify-between mb-8">
+        <h1 className="display text-5xl">Routes.</h1>
+        <button
+          onClick={() => setEditing('new')}
+          className="mt-3 border border-emerald-700 text-emerald-400 p-2 hover:bg-emerald-950/40"
+          aria-label="Add route"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      </div>
+
+      {routes.length === 0 && (
+        <div className="text-stone-500 italic text-sm">No routes yet. Tap + to add one.</div>
+      )}
+
+      <div className="space-y-3">
+        {routes.map(route => (
+          <div key={route.id} className="border border-stone-800 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <button
+                onClick={() => setEditing(route)}
+                className="flex-1 text-left min-w-0"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <MapPin className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <span className="text-stone-100 text-lg">{route.name}</span>
+                </div>
+                <div className="mono text-xs text-stone-500 ml-6">
+                  {route.miles} mi · {route.minutes} min · est. {Math.round(route.miles * STEPS_PER_MILE).toLocaleString()} steps
+                  {route.uses > 0 ? ` · walked ${route.uses}×` : ''}
+                </div>
+                {route.notes && (
+                  <div className="text-xs text-stone-400 mt-2 italic ml-6">{route.notes}</div>
+                )}
+              </button>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => onToggleFavorite(route.id)}
+                  className="p-1 text-stone-500 hover:text-amber-500"
+                  aria-label="Toggle favorite"
+                >
+                  <Star className={`w-4 h-4 ${route.favorite ? 'fill-amber-500 text-amber-500' : ''}`} />
+                </button>
+                <button
+                  onClick={() => { if (confirm(`Delete "${route.name}"?`)) onDelete(route.id); }}
+                  className="p-1 text-stone-600 hover:text-red-500"
+                  aria-label="Delete"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RouteEditor({ route, onSave, onCancel }) {
+  const [name, setName] = useState(route?.name || '');
+  const [miles, setMiles] = useState(route?.miles?.toString() || '3');
+  const [minutes, setMinutes] = useState(route?.minutes?.toString() || '55');
+  const [notes, setNotes] = useState(route?.notes || '');
+
+  const pace = miles && minutes ? (parseFloat(minutes) / parseFloat(miles)).toFixed(1) : '—';
+
+  return (
+    <div className="px-6 pt-8">
+      <button onClick={onCancel} className="mono text-xs text-stone-500 tracking-wider uppercase mb-4 flex items-center gap-2 hover:text-stone-300">
+        <X className="w-3 h-3" /> Cancel
+      </button>
+      <h1 className="display text-5xl mb-8">{route ? 'Edit' : 'New'} route.</h1>
+
+      <div className="space-y-6">
+        <Field label="Name">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Park loop"
+            className="w-full bg-transparent border-b border-stone-700 text-xl py-3 focus:border-emerald-600 outline-none placeholder:text-stone-700"
+          />
+        </Field>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Miles">
+            <input
+              type="number"
+              step="0.1"
+              value={miles}
+              onChange={(e) => setMiles(e.target.value)}
+              className="w-full bg-transparent border-b border-stone-700 text-3xl display py-3 focus:border-emerald-600 outline-none"
+            />
+          </Field>
+          <Field label="Minutes">
+            <input
+              type="number"
+              value={minutes}
+              onChange={(e) => setMinutes(e.target.value)}
+              className="w-full bg-transparent border-b border-stone-700 text-3xl display py-3 focus:border-emerald-600 outline-none"
+            />
+          </Field>
+        </div>
+
+        <div className="mono text-xs text-stone-500">
+          Pace: {pace} min/mile · ≈ {miles ? Math.round(parseFloat(miles) * STEPS_PER_MILE).toLocaleString() : '—'} steps
+        </div>
+
+        <Field label="Notes">
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. Down Main St, left at park, loop around"
+            rows={4}
+            className="w-full bg-transparent border border-stone-700 p-3 text-sm focus:border-emerald-600 outline-none placeholder:text-stone-700 resize-none"
+          />
+        </Field>
+      </div>
+
+      <button
+        onClick={() => onSave({
+          id: route?.id,
+          name,
+          miles: parseFloat(miles) || 0,
+          minutes: parseInt(minutes) || 0,
+          notes,
+        })}
+        disabled={!name || !miles}
+        className="w-full mt-10 bg-emerald-700 text-stone-100 p-5 display text-2xl hover:bg-emerald-600 disabled:bg-stone-800 disabled:text-stone-600 transition-colors"
+      >
+        {route ? 'Save Changes' : 'Save Route'}
+      </button>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <label className="mono text-xs text-stone-500 tracking-wider uppercase mb-2 block">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+
+// === END APP ===
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<FitnessTracker />);
+</script>
+
+<script>
+  // Register service worker for PWA / offline support
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(err => {
+        console.log('SW registration failed:', err);
+      });
+    });
+  }
+</script>
+</body>
+</html>
