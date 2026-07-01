@@ -1,5 +1,5 @@
 // Tracker service worker — caches the app shell so it works offline once loaded
-const CACHE_NAME = 'tracker-v1';
+const CACHE_NAME = 'tracker-v2';
 const SHELL = [
   './',
   './index.html',

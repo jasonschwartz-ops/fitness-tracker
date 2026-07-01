@@ -1577,10 +1577,70 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
   const [mealType, setMealType] = useState('lunch');
   const [recipeFilter, setRecipeFilter] = useState('all');
 
+  // Open Food Facts search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [gramsById, setGramsById] = useState({}); // per-result portion in grams
+
   const dayMeals = mealLogs.filter(m => m.date === selectedDate);
   const dayCals = dayMeals.reduce((s, m) => s + (m.calories || 0), 0);
   const dayProtein = dayMeals.reduce((s, m) => s + (m.protein || 0), 0);
   const isBackdated = selectedDate !== todayStr();
+
+  const runFoodSearch = async () => {
+    const q = searchQuery.trim();
+    if (!q) return;
+    setSearching(true);
+    setSearchError('');
+    setSearchResults([]);
+    try {
+      // Legacy search endpoint supports plain-text keyword search.
+      // page_size kept small; request only the fields we use.
+      // Identify the app via a query param since browsers can't set User-Agent.
+      const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}`
+        + `&search_simple=1&action=process&json=1&page_size=20`
+        + `&fields=product_name,brands,nutriments,serving_size`
+        + `&app_name=AsBuiltFitnessTracker`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Search failed (${res.status})`);
+      const data = await res.json();
+      const products = (data.products || [])
+        .map(p => {
+          const n = p.nutriments || {};
+          const kcal100 = n['energy-kcal_100g'] != null ? n['energy-kcal_100g']
+            : (n['energy_100g'] != null ? Math.round(n['energy_100g'] / 4.184) : null);
+          const protein100 = n['proteins_100g'] != null ? n['proteins_100g'] : null;
+          return {
+            name: [p.product_name, p.brands ? `(${p.brands.split(',')[0]})` : ''].filter(Boolean).join(' ').trim(),
+            kcal100,
+            protein100,
+            servingSize: p.serving_size || null,
+          };
+        })
+        .filter(p => p.name && (p.kcal100 != null || p.protein100 != null));
+      if (products.length === 0) {
+        setSearchError('No matches with nutrition data. Try a simpler term, or enter manually.');
+      }
+      setSearchResults(products.slice(0, 12));
+    } catch (e) {
+      setSearchError('Could not reach the food database. You can still enter values manually.');
+    }
+    setSearching(false);
+  };
+
+  // Apply a search result to the manual fields, scaled to the chosen grams
+  const applyResult = (r, idx) => {
+    const grams = parseFloat(gramsById[idx]) || 100;
+    const factor = grams / 100;
+    if (r.kcal100 != null) setCalories(String(Math.round(r.kcal100 * factor)));
+    if (r.protein100 != null) setProtein(String(Math.round(r.protein100 * factor)));
+    if (!name) setName(r.name);
+    // collapse results after picking
+    setSearchResults([]);
+    setSearchQuery('');
+  };
 
   const filteredRecipes = recipeFilter === 'all'
     ? recipes
@@ -1668,6 +1728,65 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
             className="w-full bg-transparent border-b border-stone-700 text-xl py-3 focus:border-amber-600 outline-none placeholder:text-stone-700"
           />
         </Field>
+
+        {/* Nutrition lookup (Open Food Facts) */}
+        <div className="border border-stone-800 p-4">
+          <div className="mono text-xs text-stone-500 tracking-wider uppercase mb-3">Look up nutrition</div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') runFoodSearch(); }}
+              placeholder="Search a food or product…"
+              className="flex-1 bg-transparent border-b border-stone-700 py-2 text-sm focus:border-amber-600 outline-none placeholder:text-stone-700"
+            />
+            <button
+              onClick={runFoodSearch}
+              disabled={searching || !searchQuery.trim()}
+              className="mono text-xs tracking-wider uppercase border border-stone-700 px-3 hover:bg-stone-900 disabled:text-stone-700"
+            >
+              {searching ? '…' : 'Search'}
+            </button>
+          </div>
+
+          {searchError && (
+            <div className="mono text-[10px] text-stone-500 mt-3 leading-relaxed">{searchError}</div>
+          )}
+
+          {searchResults.length > 0 && (
+            <div className="mt-4 space-y-2 max-h-80 overflow-y-auto">
+              {searchResults.map((r, idx) => (
+                <div key={idx} className="border border-stone-800 p-3">
+                  <div className="text-sm text-stone-100 mb-1">{r.name}</div>
+                  <div className="mono text-[10px] text-stone-500 tracking-wider uppercase mb-2">
+                    per 100g: {r.kcal100 != null ? `${Math.round(r.kcal100)} cal` : 'cal n/a'}
+                    {r.protein100 != null ? ` · ${Math.round(r.protein100)}g protein` : ''}
+                    {r.servingSize ? ` · serving ${r.servingSize}` : ''}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={gramsById[idx] ?? 100}
+                      onChange={(e) => setGramsById({ ...gramsById, [idx]: e.target.value })}
+                      className="w-20 bg-transparent border border-stone-700 text-center py-1 mono text-sm focus:border-amber-600 outline-none"
+                    />
+                    <span className="mono text-[10px] text-stone-500 tracking-wider uppercase">grams</span>
+                    <button
+                      onClick={() => applyResult(r, idx)}
+                      className="ml-auto mono text-xs tracking-wider uppercase border border-amber-700 text-amber-400 px-3 py-1 hover:bg-amber-950/40"
+                    >
+                      Use
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <div className="mono text-[10px] text-stone-600 leading-relaxed pt-1">
+                Data from Open Food Facts (crowdsourced) — double-check and adjust before saving.
+              </div>
+            </div>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Calories">
             <input
