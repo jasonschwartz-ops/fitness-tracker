@@ -145,9 +145,12 @@ app.put("/api/:collection/:id", async (req, res) => {
   const col = userCol(req);
   if (!col) return res.status(404).json({ error: "Unknown collection" });
   try {
+    const ref = col.doc(req.params.id);
+    const existing = await ref.get();
     const data = cleanBody(req.body);
     data.updatedAt = FieldValue.serverTimestamp();
-    await col.doc(req.params.id).set(data, { merge: true });
+    if (!existing.exists) data.createdAt = FieldValue.serverTimestamp();
+    await ref.set(data, { merge: true });
     res.json({ id: req.params.id });
   } catch (e) {
     console.error(e);
@@ -211,9 +214,16 @@ app.put("/shared/:collection/:id", async (req, res) => {
   const col = sharedCol(req);
   if (!col) return res.status(404).json({ error: "Unknown collection" });
   try {
+    const ref = col.doc(req.params.id);
+    const existing = await ref.get();
     const data = cleanBody(req.body); // createdBy stripped => immutable
     data.updatedAt = FieldValue.serverTimestamp();
-    await col.doc(req.params.id).set(data, { merge: true });
+    if (!existing.exists) {
+      // PUT used as create (client-generated ID): stamp ownership
+      data.createdBy = req.uid;
+      data.createdAt = FieldValue.serverTimestamp();
+    }
+    await ref.set(data, { merge: true });
     res.json({ id: req.params.id });
   } catch (e) {
     console.error(e);
