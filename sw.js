@@ -1,5 +1,5 @@
 // Tracker service worker — caches the app shell so it works offline once loaded
-const CACHE_NAME = 'tracker-v2';
+const CACHE_NAME = 'tracker-v3';
 const SHELL = [
   './',
   './index.html',
@@ -14,6 +14,7 @@ const CDN_HOSTS = [
   'unpkg.com',
   'fonts.googleapis.com',
   'fonts.gstatic.com',
+  'www.gstatic.com',
 ];
 
 self.addEventListener('install', (event) => {

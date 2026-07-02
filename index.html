@@ -20,6 +20,8 @@
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <style>
   body { margin: 0; background: #0c0a09; font-family: Georgia, "Times New Roman", serif; }
   .display { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; }
@@ -66,9 +68,111 @@ const PlayCircle = (p) => <Icon {...p} d={<><circle cx="12" cy="12" r="10"/><pol
 
 // === BEGIN APP ===
 
-// localStorage shim that mirrors the Claude storage API
-// All data persists in this browser. To wipe, clear localStorage for this site.
+// =====================================================================
+// CLOUD STORAGE LAYER
+// API-backed persistence with localStorage as offline read cache.
+// Same interface as before (get/set/delete/list) so the app is unchanged.
+// =====================================================================
+
+// Firebase project config (public client identifiers — not secrets)
+const firebaseConfig = {
+  apiKey: "AIzaSyAgOBEvVZ406t4r_lHzipFEGC8QOzw7LjI",
+  authDomain: "fitness-tracker-4e2a1.firebaseapp.com",
+  projectId: "fitness-tracker-4e2a1",
+  storageBucket: "fitness-tracker-4e2a1.firebasestorage.app",
+  messagingSenderId: "307378695445",
+  appId: "1:307378695445:web:a36610bfc8a04b7e704d1c"
+};
+
+const API_BASE = "https://fitness-api-307378695445.us-central1.run.app";
+
+firebase.initializeApp(firebaseConfig);
+
 const STORAGE_PREFIX = 'fitness_tracker:';
+const QUEUE_KEY = 'fitness_tracker_queue';
+
+// Maps legacy key prefixes -> API endpoints
+const KEY_MAP = [
+  { prefix: 'meal:',    api: '/api/meals' },
+  { prefix: 'weigh:',   api: '/api/weighIns' },
+  { prefix: 'workout:', api: '/api/workouts' },
+  { prefix: 'yoga:',    api: '/api/yoga' },
+  { prefix: 'walk:',    api: '/api/mobility' },
+  { prefix: 'recipe:',  api: '/shared/recipes' },
+  { prefix: 'route:',   api: '/shared/routes' },
+];
+
+function routeForKey(key) {
+  for (const m of KEY_MAP) {
+    if (key.startsWith(m.prefix)) {
+      return { path: m.api + '/' + encodeURIComponent(key.slice(m.prefix.length)), wrap: false };
+    }
+  }
+  if (key === 'custom_exercises') {
+    return { path: '/api/customExercises/main', wrap: true };
+  }
+  return null; // meta:* and anything else stays local-only
+}
+
+async function authedFetch(path, options = {}) {
+  const user = firebase.auth().currentUser;
+  if (!user) throw new Error('Not signed in');
+  const token = await user.getIdToken();
+  const res = await fetch(API_BASE + path, {
+    ...options,
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    let msg = res.status;
+    try { msg += ': ' + JSON.stringify(await res.json()); } catch (e) {}
+    throw new Error('API ' + msg);
+  }
+  return res.json();
+}
+
+// ---- Offline write queue ----
+function readQueue() {
+  try { return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; } catch (e) { return []; }
+}
+function writeQueue(q) { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); }
+
+function enqueue(op) {
+  const q = readQueue();
+  // newest write for a path wins; drop older ops for the same path
+  writeQueue(q.filter((o) => o.path !== op.path).concat(op));
+}
+
+async function flushQueue() {
+  let q = readQueue();
+  if (!q.length || !navigator.onLine) return;
+  const remaining = [];
+  for (const op of q) {
+    try {
+      await authedFetch(op.path, { method: op.method, body: op.body });
+    } catch (e) {
+      remaining.push(op); // keep for next flush
+    }
+  }
+  writeQueue(remaining);
+}
+window.addEventListener('online', () => { flushQueue(); });
+
+async function apiWrite(method, path, body) {
+  const op = { method, path, body: body ? JSON.stringify(body) : undefined };
+  if (!navigator.onLine) { enqueue(op); return; }
+  try {
+    await authedFetch(path, { method, body: op.body });
+  } catch (e) {
+    console.warn('API write queued after failure:', e.message);
+    enqueue(op);
+  }
+}
+
+// ---- Cache-backed storage (same interface as before) ----
 const storage = {
   async get(key) {
     const raw = localStorage.getItem(STORAGE_PREFIX + key);
@@ -77,10 +181,18 @@ const storage = {
   },
   async set(key, value) {
     localStorage.setItem(STORAGE_PREFIX + key, value);
+    const route = routeForKey(key);
+    if (route) {
+      let body = JSON.parse(value);
+      if (route.wrap) body = { data: body };
+      apiWrite('PUT', route.path, body);
+    }
     return { key, value, shared: false };
   },
   async delete(key) {
     localStorage.removeItem(STORAGE_PREFIX + key);
+    const route = routeForKey(key);
+    if (route && !route.wrap) apiWrite('DELETE', route.path);
     return { key, deleted: true, shared: false };
   },
   async list(prefix = '') {
@@ -95,6 +207,41 @@ const storage = {
     return { keys, prefix, shared: false };
   },
 };
+
+// ---- Full sync: server -> cache (runs after sign-in, before app mounts) ----
+async function syncFromServer() {
+  if (!navigator.onLine) return; // offline: serve from cache
+
+  const pulls = KEY_MAP.map(async (m) => {
+    const data = await authedFetch(m.api);
+    return { prefix: m.prefix, items: data.items || [] };
+  });
+  const results = await Promise.all(pulls);
+  const custom = await authedFetch('/api/customExercises').catch(() => ({ items: [] }));
+
+  // Remove stale cached entries for synced prefixes, then repopulate
+  const staleKeys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith(STORAGE_PREFIX)) continue;
+    const bare = k.substring(STORAGE_PREFIX.length);
+    if (KEY_MAP.some((m) => bare.startsWith(m.prefix)) || bare === 'custom_exercises') {
+      staleKeys.push(k);
+    }
+  }
+  staleKeys.forEach((k) => localStorage.removeItem(k));
+
+  for (const r of results) {
+    for (const item of r.items) {
+      const { createdAt, updatedAt, ...doc } = item;
+      localStorage.setItem(STORAGE_PREFIX + r.prefix + item.id, JSON.stringify(doc));
+    }
+  }
+  const main = (custom.items || []).find((d) => d.id === 'main');
+  if (main && main.data) {
+    localStorage.setItem(STORAGE_PREFIX + 'custom_exercises', JSON.stringify(main.data));
+  }
+}
 
 // Standard exercise catalog — users can add from these to any workout
 const EXERCISE_CATALOG = [
@@ -322,8 +469,8 @@ function FitnessTracker() {
           } catch (e) { /* skip bad keys */ }
         }
 
-        // Seed starters on first run only
-        if (!seedFlag) {
+        // Seed starters only on true first run (no seed flag AND server returned nothing shared)
+        if (!seedFlag && recipesFromStorage.length === 0 && routesFromStorage.length === 0) {
           for (const r of STARTER_RECIPES) {
             const rec = { ...r, timestamp: Date.now(), uses: 0, favorite: false };
             await storage.set(`recipe:${r.id}`, JSON.stringify(rec));
@@ -684,6 +831,10 @@ function FitnessTracker() {
           }}
           onUseRecipe={useRecipe}
           onManageRecipes={() => setView('recipes')}
+          onDeleteMeal={async (id) => {
+            await storage.delete(`meal:${id}`);
+            setMealLogs(mealLogs.filter(m => m.id !== id));
+          }}
           onBack={() => setView('home')}
         />
       )}
@@ -964,8 +1115,14 @@ function HomeView({ workoutLogs, walkLogs, weighIns, mealLogs, yogaLogs, selecte
           </button>
         </div>
         <div className="mono text-[10px] text-stone-700 tracking-wider text-center pt-2">
-          Data lives in this browser only. Export regularly.
+          Synced to the cloud for {firebase.auth().currentUser?.email || 'your account'}.
         </div>
+        <button
+          onClick={async () => { await firebase.auth().signOut(); window.location.reload(); }}
+          className="w-full border border-stone-800 text-stone-500 mono text-xs tracking-wider uppercase py-3 hover:bg-stone-900 hover:text-stone-300 transition-colors"
+        >
+          Sign out
+        </button>
       </div>
     </div>
   );
@@ -1570,7 +1727,7 @@ function WeighView({ weighIns, selectedDate, onSave, onBack }) {
   );
 }
 
-function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onManageRecipes, onBack }) {
+function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onManageRecipes, onDeleteMeal, onBack }) {
   const [name, setName] = useState('');
   const [calories, setCalories] = useState('');
   const [protein, setProtein] = useState('');
@@ -1596,29 +1753,15 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
     setSearchError('');
     setSearchResults([]);
     try {
-      // Legacy search endpoint supports plain-text keyword search.
-      // page_size kept small; request only the fields we use.
-      // Identify the app via a query param since browsers can't set User-Agent.
-      const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}`
-        + `&search_simple=1&action=process&json=1&page_size=20`
-        + `&fields=product_name,brands,nutriments,serving_size`
-        + `&app_name=AsBuiltFitnessTracker`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Search failed (${res.status})`);
-      const data = await res.json();
-      const products = (data.products || [])
-        .map(p => {
-          const n = p.nutriments || {};
-          const kcal100 = n['energy-kcal_100g'] != null ? n['energy-kcal_100g']
-            : (n['energy_100g'] != null ? Math.round(n['energy_100g'] / 4.184) : null);
-          const protein100 = n['proteins_100g'] != null ? n['proteins_100g'] : null;
-          return {
-            name: [p.product_name, p.brands ? `(${p.brands.split(',')[0]})` : ''].filter(Boolean).join(' ').trim(),
-            kcal100,
-            protein100,
-            servingSize: p.serving_size || null,
-          };
-        })
+      // Server-side USDA lookup via our Cloud Run API (key never leaves the server)
+      const data = await authedFetch('/nutrition/search?q=' + encodeURIComponent(q));
+      const products = (data.foods || [])
+        .map(f => ({
+          name: [f.description, f.brand ? `(${f.brand})` : ''].filter(Boolean).join(' ').trim(),
+          kcal100: f.calories != null ? f.calories : null,
+          protein100: f.protein != null ? f.protein : null,
+          servingSize: f.servingSize ? `${f.servingSize}${f.servingSizeUnit || ''}` : null,
+        }))
         .filter(p => p.name && (p.kcal100 != null || p.protein100 != null));
       if (products.length === 0) {
         setSearchError('No matches with nutrition data. Try a simpler term, or enter manually.');
@@ -1657,6 +1800,28 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
       <div className="mono text-xs text-stone-500 tracking-wider uppercase mb-8">
         This day so far: {dayCals} cal · {dayProtein}g protein
       </div>
+
+      {dayMeals.length > 0 && (
+        <div className="mb-8 border border-stone-800 divide-y divide-stone-900">
+          {dayMeals.map((m) => (
+            <div key={m.id} className="flex items-center justify-between px-4 py-3">
+              <div className="min-w-0">
+                <div className="text-stone-200 text-sm truncate">{m.name}</div>
+                <div className="mono text-[10px] text-stone-500 tracking-wider uppercase">
+                  {m.mealType || 'meal'} · {m.calories || 0} cal · {m.protein || 0}g protein
+                </div>
+              </div>
+              <button
+                onClick={() => { if (confirm(`Delete "${m.name}"?`)) onDeleteMeal(m.id); }}
+                className="text-stone-600 hover:text-red-400 transition-colors ml-3 shrink-0"
+                aria-label="Delete meal"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Recipe quick-pick */}
       {recipes.length > 0 && (
@@ -2316,8 +2481,78 @@ function formatDate(dateStr) {
 
 // === END APP ===
 
+function SignInScreen({ onSignIn, error, busy }) {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-8 grain">
+      <div className="mono text-xs text-stone-500 tracking-[0.3em] uppercase mb-3">Tracker</div>
+      <h1 className="display text-5xl text-stone-100 mb-2 text-center">Train. Eat. Log.</h1>
+      <p className="mono text-xs text-stone-500 tracking-wider text-center mb-10">
+        Sign in to sync across your devices.
+      </p>
+      <button
+        onClick={onSignIn}
+        disabled={busy}
+        className="border border-stone-700 text-stone-200 mono text-sm tracking-wider uppercase px-8 py-4 hover:bg-stone-900 transition-colors disabled:opacity-50"
+      >
+        {busy ? 'Signing in…' : 'Sign in with Google'}
+      </button>
+      {error && <div className="mono text-xs text-red-400 mt-6 text-center max-w-xs">{error}</div>}
+    </div>
+  );
+}
+
+function Root() {
+  const [user, setUser] = useState(undefined); // undefined = auth state loading
+  const [ready, setReady] = useState(false);   // sync complete
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    firebase.auth().getRedirectResult().catch((e) => setError(e.message));
+    return firebase.auth().onAuthStateChanged((u) => setUser(u));
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        await syncFromServer();
+      } catch (e) {
+        console.warn('Sync failed, serving cached data:', e.message);
+      }
+      flushQueue();
+      setReady(true);
+    })();
+  }, [user]);
+
+  const signIn = async () => {
+    setBusy(true); setError('');
+    const provider = new firebase.auth.GoogleAuthProvider();
+    try {
+      await firebase.auth().signInWithPopup(provider);
+    } catch (e) {
+      // Popups are unreliable in installed/standalone PWAs — fall back to redirect
+      if (['auth/popup-blocked', 'auth/popup-closed-by-user', 'auth/operation-not-supported-in-this-environment', 'auth/cancelled-popup-request'].includes(e.code)) {
+        try { await firebase.auth().signInWithRedirect(provider); } catch (e2) { setError(e2.message); }
+      } else {
+        setError(e.message);
+      }
+    }
+    setBusy(false);
+  };
+
+  if (user === undefined) {
+    return <div className="min-h-screen flex items-center justify-center mono text-xs text-stone-600 tracking-[0.3em] uppercase">Loading…</div>;
+  }
+  if (!user) return <SignInScreen onSignIn={signIn} error={error} busy={busy} />;
+  if (!ready) {
+    return <div className="min-h-screen flex items-center justify-center mono text-xs text-stone-600 tracking-[0.3em] uppercase">Syncing…</div>;
+  }
+  return <FitnessTracker />;
+}
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<FitnessTracker />);
+root.render(<Root />);
 </script>
 
 <script>
