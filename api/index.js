@@ -45,6 +45,7 @@ async function requireAuth(req, res, next) {
 const HOUSEHOLD_UIDS = [
   "l54KxiEeMnQ9kf4FuGamqN4KqXe2", // Jason
   "TohGuGoD0jT4EVeWEWHousYz1kp2", // Gretchen
+  "fvecqmkaOrgOKYjKI9k22S2Uwq43", // Elle
 ];
 function requireHousehold(req, res, next) {
   if (HOUSEHOLD_UIDS.length && !HOUSEHOLD_UIDS.includes(req.uid)) {
@@ -305,6 +306,76 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
   } catch (e) {
     console.error("USDA lookup failed:", e);
     res.status(502).json({ error: "Nutrition lookup failed" });
+  }
+});
+
+// GET /nutrition/food/:fdcId  ->  per-100g macros + household portions
+app.get("/nutrition/food/:fdcId", requireAuth, requireHousehold, async (req, res) => {
+  if (!USDA_KEY) return res.status(500).json({ error: "USDA key not configured" });
+  const fdcId = req.params.fdcId.replace(/[^0-9]/g, "");
+  if (!fdcId) return res.status(400).json({ error: "Bad fdcId" });
+
+  try {
+    const url = new URL(`https://api.nal.usda.gov/fdc/v1/food/${fdcId}`);
+    url.searchParams.set("api_key", USDA_KEY);
+    const r = await fetch(url);
+    if (!r.ok) return res.status(502).json({ error: `USDA responded ${r.status}` });
+    const f = await r.json();
+
+    // Per-100g macros (detail endpoint nests ids under n.nutrient.id)
+    const nutrients = {};
+    for (const n of f.foodNutrients || []) {
+      const key = NUTRIENT_IDS[n.nutrient?.id];
+      const val = n.amount;
+      if (key && val != null && nutrients[key] === undefined) nutrients[key] = val;
+    }
+    if (nutrients.carbs !== undefined && nutrients.carbs < 0) nutrients.carbs = 0;
+    if (nutrients.calories === undefined &&
+        (nutrients.protein !== undefined || nutrients.fat !== undefined || nutrients.carbs !== undefined)) {
+      nutrients.calories = Math.round(
+        (nutrients.protein || 0) * 4 + (nutrients.carbs || 0) * 4 + (nutrients.fat || 0) * 9
+      );
+    }
+
+    // Household portions: "1 large" = 50g, "1 slice" = 8g, etc.
+    const portions = [];
+    for (const p of f.foodPortions || []) {
+      if (!p.gramWeight) continue;
+      let label = (p.portionDescription || "").trim();
+      if (!label || /quantity not specified/i.test(label)) {
+        const unit = p.measureUnit?.name && p.measureUnit.name !== "undetermined" ? p.measureUnit.name : "";
+        label = [p.amount, unit, p.modifier].filter(Boolean).join(" ").trim();
+      }
+      if (!label) continue;
+      portions.push({ label, grams: Math.round(p.gramWeight * 100) / 100 });
+    }
+    // Branded foods: single labeled serving instead of foodPortions
+    if (!portions.length && f.householdServingFullText && f.servingSize &&
+        /g/i.test(f.servingSizeUnit || "")) {
+      portions.push({
+        label: f.householdServingFullText.trim(),
+        grams: Math.round(f.servingSize * 100) / 100,
+      });
+    }
+    // De-dupe by label
+    const seen = new Set();
+    const uniquePortions = portions.filter((p) => {
+      const k = p.label.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    }).slice(0, 12);
+
+    res.json({
+      fdcId: f.fdcId,
+      description: f.description,
+      brand: f.brandOwner || null,
+      ...nutrients,               // per 100g
+      portions: uniquePortions,   // [{ label, grams }]
+    });
+  } catch (e) {
+    console.error("USDA detail failed:", e);
+    res.status(502).json({ error: "Food detail lookup failed" });
   }
 });
 
