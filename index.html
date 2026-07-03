@@ -1740,6 +1740,36 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [gramsById, setGramsById] = useState({}); // per-result portion in grams
+  const [portionsById, setPortionsById] = useState({});   // idx -> [{label, grams}]
+  const [portionSelById, setPortionSelById] = useState({}); // idx -> selected portion index or 'g'
+  const [qtyById, setQtyById] = useState({});              // idx -> quantity multiplier
+  const [portionLoading, setPortionLoading] = useState({});
+
+  const loadPortions = async (r, idx) => {
+    if (!r.fdcId || portionsById[idx]) return;
+    setPortionLoading(pl => ({ ...pl, [idx]: true }));
+    try {
+      const d = await authedFetch('/nutrition/food/' + r.fdcId);
+      setPortionsById(p => ({ ...p, [idx]: d.portions || [] }));
+      if ((d.portions || []).length > 0) {
+        setPortionSelById(s => ({ ...s, [idx]: 0 }));
+        setQtyById(q => ({ ...q, [idx]: 1 }));
+        setGramsById(g => ({ ...g, [idx]: String(Math.round(d.portions[0].grams)) }));
+      }
+    } catch (e) {
+      setPortionsById(p => ({ ...p, [idx]: [] }));
+    }
+    setPortionLoading(pl => ({ ...pl, [idx]: false }));
+  };
+
+  const pickPortion = (idx, sel, qty) => {
+    setPortionSelById(s => ({ ...s, [idx]: sel }));
+    setQtyById(q => ({ ...q, [idx]: qty }));
+    const plist = portionsById[idx] || [];
+    if (sel !== 'g' && plist[sel]) {
+      setGramsById(g => ({ ...g, [idx]: String(Math.round(plist[sel].grams * qty)) }));
+    }
+  };
 
   const dayMeals = mealLogs.filter(m => m.date === selectedDate);
   const dayCals = dayMeals.reduce((s, m) => s + (m.calories || 0), 0);
@@ -1757,6 +1787,7 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
       const data = await authedFetch('/nutrition/search?q=' + encodeURIComponent(q));
       const products = (data.foods || [])
         .map(f => ({
+          fdcId: f.fdcId,
           name: [f.description, f.brand ? `(${f.brand})` : ''].filter(Boolean).join(' ').trim(),
           kcal100: f.calories != null ? f.calories : null,
           protein100: f.protein != null ? f.protein : null,
@@ -1929,6 +1960,40 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
                     {r.protein100 != null ? ` · ${Math.round(r.protein100)}g protein` : ''}
                     {r.servingSize ? ` · serving ${r.servingSize}` : ''}
                   </div>
+                  {portionsById[idx] === undefined && r.fdcId && (
+                    <button
+                      onClick={() => loadPortions(r, idx)}
+                      disabled={portionLoading[idx]}
+                      className="mono text-[10px] tracking-wider uppercase border border-stone-700 text-stone-400 px-2 py-1 mb-2 hover:border-amber-700 hover:text-amber-400 disabled:opacity-50"
+                    >
+                      {portionLoading[idx] ? 'Loading…' : 'Portions (1 egg, 1 slice…)'}
+                    </button>
+                  )}
+                  {(portionsById[idx] || []).length > 0 && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        type="number"
+                        min="0.25"
+                        step="0.25"
+                        value={qtyById[idx] ?? 1}
+                        onChange={(e) => pickPortion(idx, portionSelById[idx] ?? 0, parseFloat(e.target.value) || 1)}
+                        className="w-14 bg-transparent border border-stone-700 text-center py-1 mono text-sm focus:border-amber-600 outline-none"
+                      />
+                      <span className="mono text-[10px] text-stone-500">×</span>
+                      <select
+                        value={portionSelById[idx] ?? 0}
+                        onChange={(e) => pickPortion(idx, parseInt(e.target.value), qtyById[idx] ?? 1)}
+                        className="flex-1 bg-stone-950 border border-stone-700 text-stone-200 mono text-xs py-1 px-2 focus:border-amber-600 outline-none"
+                      >
+                        {(portionsById[idx] || []).map((p, pi) => (
+                          <option key={pi} value={pi}>{p.label} ({Math.round(p.grams)}g)</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {portionsById[idx] !== undefined && (portionsById[idx] || []).length === 0 && (
+                    <div className="mono text-[10px] text-stone-600 mb-2">No portion data for this item — use grams.</div>
+                  )}
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
@@ -1947,7 +2012,7 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
                 </div>
               ))}
               <div className="mono text-[10px] text-stone-600 leading-relaxed pt-1">
-                Data from Open Food Facts (crowdsourced) — double-check and adjust before saving.
+                Data from USDA FoodData Central. Tap Portions for household measures.
               </div>
             </div>
           )}
