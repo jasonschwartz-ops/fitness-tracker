@@ -269,14 +269,21 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
     const url = new URL("https://api.nal.usda.gov/fdc/v1/foods/search");
     url.searchParams.set("api_key", USDA_KEY);
     url.searchParams.set("query", q);
-    url.searchParams.set("pageSize", "10");
+    url.searchParams.set("pageSize", "25");
     url.searchParams.set("dataType", "Foundation,SR Legacy,Branded");
 
     const r = await fetch(url);
     if (!r.ok) return res.status(502).json({ error: `USDA responded ${r.status}` });
     const data = await r.json();
 
-    const foods = (data.foods || []).map((f) => {
+    // Generic foods (Foundation / SR Legacy) carry household portions and
+    // trustworthy per-100g data — surface them ahead of branded products.
+    const ranked = [...(data.foods || [])].sort((a, b) => {
+      const rank = (f) => (f.dataType === "Branded" ? 1 : 0);
+      return rank(a) - rank(b);
+    }).slice(0, 12);
+
+    const foods = ranked.map((f) => {
       const nutrients = {};
       for (const n of f.foodNutrients || []) {
         const key = NUTRIENT_IDS[n.nutrientId];
