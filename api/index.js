@@ -266,24 +266,38 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
   if (!USDA_KEY) return res.status(500).json({ error: "USDA key not configured" });
 
   try {
-    const url = new URL("https://api.nal.usda.gov/fdc/v1/foods/search");
-    url.searchParams.set("api_key", USDA_KEY);
-    url.searchParams.set("query", q);
-    url.searchParams.set("pageSize", "25");
-    url.searchParams.set("dataType", "Foundation,SR Legacy,Branded");
+    // Two parallel searches: SR Legacy is queried separately because it is
+    // the dataset with household portions ("1 large egg" = 50g) and reliable
+    // detail records — but USDA's combined relevance ranking often buries it
+    // under Foundation entries whose detail endpoints 404 (known FDC bug).
+    const buildUrl = (dataType, pageSize) => {
+      const url = new URL("https://api.nal.usda.gov/fdc/v1/foods/search");
+      url.searchParams.set("api_key", USDA_KEY);
+      url.searchParams.set("query", q);
+      url.searchParams.set("pageSize", String(pageSize));
+      url.searchParams.set("dataType", dataType);
+      return url;
+    };
 
-    const r = await fetch(url);
-    if (!r.ok) return res.status(502).json({ error: `USDA responded ${r.status}` });
-    const data = await r.json();
+    const [srRes, otherRes] = await Promise.all([
+      fetch(buildUrl("SR Legacy", 8)),
+      fetch(buildUrl("Foundation,Branded", 15)),
+    ]);
+    if (!srRes.ok && !otherRes.ok) {
+      return res.status(502).json({ error: `USDA responded ${srRes.status}` });
+    }
+    const srData = srRes.ok ? await srRes.json() : { foods: [] };
+    const otherData = otherRes.ok ? await otherRes.json() : { foods: [] };
 
-    // SR Legacy first: it has household portions AND reliably retrievable
-    // detail records. Foundation entries sometimes 404 on the detail
-    // endpoint (known FDC inconsistency). Branded last.
-    const ranked = [...(data.foods || [])].sort((a, b) => {
-      const rank = (f) =>
-        f.dataType === "SR Legacy" ? 0 : f.dataType === "Foundation" ? 1 : 2;
+    // SR Legacy first, then Foundation, then Branded; dedupe by fdcId
+    const otherSorted = [...(otherData.foods || [])].sort((a, b) => {
+      const rank = (f) => (f.dataType === "Foundation" ? 0 : 1);
       return rank(a) - rank(b);
-    }).slice(0, 12);
+    });
+    const seen = new Set();
+    const ranked = [...(srData.foods || []), ...otherSorted]
+      .filter((f) => (seen.has(f.fdcId) ? false : (seen.add(f.fdcId), true)))
+      .slice(0, 12);
 
     const foods = ranked.map((f) => {
       const nutrients = {};
