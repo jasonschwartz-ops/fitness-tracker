@@ -1,5 +1,5 @@
 // Tracker service worker — caches the app shell so it works offline once loaded
-const CACHE_NAME = 'tracker-v3';
+const CACHE_NAME = 'tracker-v4';
 const SHELL = [
   './',
   './index.html',
@@ -42,7 +42,28 @@ self.addEventListener('fetch', (event) => {
 
   if (!isShell && !isCDN) return; // pass through other requests
 
-  // Stale-while-revalidate for app shell + CDN assets
+  const isHTML = event.request.mode === 'navigate' ||
+    url.pathname.endsWith('/') || url.pathname.endsWith('.html');
+
+  if (isShell && isHTML) {
+    // NETWORK-FIRST for the app shell: always try for the newest version
+    // (bypassing the HTTP cache), fall back to cache only when offline.
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) =>
+        fetch(event.request, { cache: 'no-store' })
+          .then((response) => {
+            if (response && response.status === 200) {
+              cache.put(event.request, response.clone()).catch(() => {});
+            }
+            return response;
+          })
+          .catch(() => cache.match(event.request))
+      )
+    );
+    return;
+  }
+
+  // Stale-while-revalidate for CDN assets + other shell files
   event.respondWith(
     caches.open(CACHE_NAME).then((cache) =>
       cache.match(event.request).then((cached) => {
