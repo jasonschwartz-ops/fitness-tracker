@@ -276,10 +276,12 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
     if (!r.ok) return res.status(502).json({ error: `USDA responded ${r.status}` });
     const data = await r.json();
 
-    // Generic foods (Foundation / SR Legacy) carry household portions and
-    // trustworthy per-100g data — surface them ahead of branded products.
+    // SR Legacy first: it has household portions AND reliably retrievable
+    // detail records. Foundation entries sometimes 404 on the detail
+    // endpoint (known FDC inconsistency). Branded last.
     const ranked = [...(data.foods || [])].sort((a, b) => {
-      const rank = (f) => (f.dataType === "Branded" ? 1 : 0);
+      const rank = (f) =>
+        f.dataType === "SR Legacy" ? 0 : f.dataType === "Foundation" ? 1 : 2;
       return rank(a) - rank(b);
     }).slice(0, 12);
 
