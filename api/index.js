@@ -270,6 +270,29 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
     // the dataset with household portions ("1 large egg" = 50g) and reliable
     // detail records — but USDA's combined relevance ranking often buries it
     // under Foundation entries whose detail endpoints 404 (known FDC bug).
+    // Common-name aliases: expand queries to the terms USDA actually
+    // indexes staples under (e.g. FNDDS files bacon as "Pork bacon").
+    const ALIASES = {
+      bacon: "pork bacon",
+      burger: "ground beef",
+      hamburger: "ground beef",
+      soda: "soft drink",
+      pop: "soft drink",
+      oatmeal: "oats cereal cooked",
+      "peanut butter": "peanut butter",
+      pb: "peanut butter",
+      mayo: "mayonnaise",
+      "chicken breast": "chicken breast",
+      steak: "beef steak",
+      fries: "white potato french fries",
+      chips: "potato chips",
+      "protein shake": "protein powder whey",
+      yogurt: "yogurt",
+      oj: "orange juice",
+    };
+    const expandedQ = ALIASES[qLower0(q)] || q;
+    function qLower0(s) { return s.toLowerCase().trim(); }
+
     // POST search: dataType goes as a JSON array, avoiding the GET
     // comma-list parsing that breaks on "Survey (FNDDS)" / "SR Legacy".
     const search = async (dataTypes, pageSize, label) => {
@@ -278,7 +301,7 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: q, dataType: dataTypes, pageSize }),
+          body: JSON.stringify({ query: expandedQ, dataType: dataTypes, pageSize }),
         }
       );
       if (!r.ok) {
@@ -291,7 +314,7 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
     const [staplesData, otherData] = await Promise.all([
       // Survey (FNDDS) = the dietary-recall dataset: consumer food names
       // with household portions. SR Legacy = classic staples with portions.
-      search(["Survey (FNDDS)", "SR Legacy"], 15, "staples"),
+      search(["Survey (FNDDS)", "SR Legacy"], 30, "staples"),
       search(["Foundation", "Branded"], 10, "other"),
     ]);
     if (!(staplesData.foods || []).length && !(otherData.foods || []).length) {
@@ -302,7 +325,7 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
     // comma-separated name tokens — so "Bacon, NFS" and "Pork bacon" beat
     // "Salad with bacon" — and (b) name brevity, so plain generic entries
     // ("Egg, NFS", "Egg, whole, raw") beat composed dishes ("Egg, Benedict").
-    const qLower = q.toLowerCase();
+    const qLower = expandedQ.toLowerCase();
     const score = (f) => {
       const desc = (f.description || "").toLowerCase();
       const tokens = desc.split(",").map((t) => t.trim());

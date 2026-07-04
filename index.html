@@ -1734,6 +1734,25 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
   const [mealType, setMealType] = useState('lunch');
   const [recipeFilter, setRecipeFilter] = useState('all');
 
+  // Recent foods: most-frequently + most-recently logged, deduped by name
+  const recentFoods = React.useMemo(() => {
+    const byName = {};
+    for (const m of mealLogs) {
+      if (!m.name) continue;
+      const key = m.name.trim().toLowerCase();
+      if (!byName[key]) byName[key] = { name: m.name, calories: m.calories, protein: m.protein, mealType: m.mealType, count: 0, last: 0 };
+      byName[key].count += 1;
+      byName[key].last = Math.max(byName[key].last, m.timestamp || 0);
+      // keep most recent macros for the entry
+      if ((m.timestamp || 0) >= byName[key].last) {
+        byName[key].calories = m.calories; byName[key].protein = m.protein;
+      }
+    }
+    return Object.values(byName)
+      .sort((a, b) => b.count - a.count || b.last - a.last)
+      .slice(0, 8);
+  }, [mealLogs]);
+
   // Open Food Facts search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -1915,6 +1934,28 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
             ))}
           </div>
         </div>
+        {recentFoods.length > 0 && (
+          <div className="mb-6">
+            <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase mb-3">Quick add · Recent</div>
+            <div className="flex flex-wrap gap-2">
+              {recentFoods.map((rf) => (
+                <button
+                  key={rf.name}
+                  onClick={() => {
+                    setName(rf.name);
+                    setCalories(rf.calories != null ? String(rf.calories) : '');
+                    setProtein(rf.protein != null ? String(rf.protein) : '');
+                    if (rf.mealType) setMealType(rf.mealType);
+                  }}
+                  className="border border-stone-800 text-stone-300 mono text-xs px-3 py-2 hover:border-amber-700 hover:text-amber-400 transition-colors"
+                >
+                  {rf.name} <span className="text-stone-600">· {rf.calories || 0} cal</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <Field label="What did you eat?">
           <input
             type="text"
