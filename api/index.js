@@ -279,23 +279,34 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
       return url;
     };
 
-    const [srRes, otherRes] = await Promise.all([
-      fetch(buildUrl("SR Legacy", 8)),
-      fetch(buildUrl("Foundation,Branded", 15)),
+    const [staplesRes, otherRes] = await Promise.all([
+      // Survey (FNDDS) = the dietary-recall dataset: consumer food names
+      // with household portions. SR Legacy = classic staples with portions.
+      fetch(buildUrl("Survey (FNDDS),SR Legacy", 15)),
+      fetch(buildUrl("Foundation,Branded", 10)),
     ]);
-    if (!srRes.ok && !otherRes.ok) {
-      return res.status(502).json({ error: `USDA responded ${srRes.status}` });
+    if (!staplesRes.ok && !otherRes.ok) {
+      return res.status(502).json({ error: `USDA responded ${staplesRes.status}` });
     }
-    const srData = srRes.ok ? await srRes.json() : { foods: [] };
+    const staplesData = staplesRes.ok ? await staplesRes.json() : { foods: [] };
     const otherData = otherRes.ok ? await otherRes.json() : { foods: [] };
 
-    // SR Legacy first, then Foundation, then Branded; dedupe by fdcId
+    // Within the staples tier, boost foods whose name STARTS with the query
+    // ("Egg, whole, raw" beats "Bread, egg" for the query "egg").
+    const qLower = q.toLowerCase();
+    const startsBoost = (f) =>
+      (f.description || "").toLowerCase().startsWith(qLower) ? 0 : 1;
+    const staplesSorted = [...(staplesData.foods || [])]
+      .map((f, i) => ({ f, i }))
+      .sort((a, b) => startsBoost(a.f) - startsBoost(b.f) || a.i - b.i)
+      .map((x) => x.f);
+
     const otherSorted = [...(otherData.foods || [])].sort((a, b) => {
       const rank = (f) => (f.dataType === "Foundation" ? 0 : 1);
       return rank(a) - rank(b);
     });
     const seen = new Set();
-    const ranked = [...(srData.foods || []), ...otherSorted]
+    const ranked = [...staplesSorted, ...otherSorted]
       .filter((f) => (seen.has(f.fdcId) ? false : (seen.add(f.fdcId), true)))
       .slice(0, 12);
 
