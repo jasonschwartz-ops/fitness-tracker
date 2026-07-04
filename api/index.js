@@ -270,26 +270,33 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
     // the dataset with household portions ("1 large egg" = 50g) and reliable
     // detail records — but USDA's combined relevance ranking often buries it
     // under Foundation entries whose detail endpoints 404 (known FDC bug).
-    const buildUrl = (dataType, pageSize) => {
-      const url = new URL("https://api.nal.usda.gov/fdc/v1/foods/search");
-      url.searchParams.set("api_key", USDA_KEY);
-      url.searchParams.set("query", q);
-      url.searchParams.set("pageSize", String(pageSize));
-      url.searchParams.set("dataType", dataType);
-      return url;
+    // POST search: dataType goes as a JSON array, avoiding the GET
+    // comma-list parsing that breaks on "Survey (FNDDS)" / "SR Legacy".
+    const search = async (dataTypes, pageSize, label) => {
+      const r = await fetch(
+        `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${USDA_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: q, dataType: dataTypes, pageSize }),
+        }
+      );
+      if (!r.ok) {
+        console.error(`USDA ${label} search failed: ${r.status} ${await r.text().catch(() => "")}`);
+        return { foods: [] };
+      }
+      return r.json();
     };
 
-    const [staplesRes, otherRes] = await Promise.all([
+    const [staplesData, otherData] = await Promise.all([
       // Survey (FNDDS) = the dietary-recall dataset: consumer food names
       // with household portions. SR Legacy = classic staples with portions.
-      fetch(buildUrl("Survey (FNDDS),SR Legacy", 15)),
-      fetch(buildUrl("Foundation,Branded", 10)),
+      search(["Survey (FNDDS)", "SR Legacy"], 15, "staples"),
+      search(["Foundation", "Branded"], 10, "other"),
     ]);
-    if (!staplesRes.ok && !otherRes.ok) {
-      return res.status(502).json({ error: `USDA responded ${staplesRes.status}` });
+    if (!(staplesData.foods || []).length && !(otherData.foods || []).length) {
+      return res.status(502).json({ error: "USDA search returned nothing" });
     }
-    const staplesData = staplesRes.ok ? await staplesRes.json() : { foods: [] };
-    const otherData = otherRes.ok ? await otherRes.json() : { foods: [] };
 
     // Within the staples tier, boost foods whose name STARTS with the query
     // ("Egg, whole, raw" beats "Bread, egg" for the query "egg").
