@@ -298,14 +298,21 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
       return res.status(502).json({ error: "USDA search returned nothing" });
     }
 
-    // Within the staples tier, boost foods whose name STARTS with the query
-    // ("Egg, whole, raw" beats "Bread, egg" for the query "egg").
+    // Rank staples by (a) how early the query appears among the
+    // comma-separated name tokens — so "Bacon, NFS" and "Pork bacon" beat
+    // "Salad with bacon" — and (b) name brevity, so plain generic entries
+    // ("Egg, NFS", "Egg, whole, raw") beat composed dishes ("Egg, Benedict").
     const qLower = q.toLowerCase();
-    const startsBoost = (f) =>
-      (f.description || "").toLowerCase().startsWith(qLower) ? 0 : 1;
+    const score = (f) => {
+      const desc = (f.description || "").toLowerCase();
+      const tokens = desc.split(",").map((t) => t.trim());
+      let idx = tokens.findIndex((t) => t.startsWith(qLower) || t.includes(" " + qLower));
+      if (idx === -1) idx = 9;
+      return idx * 100 + Math.min(desc.length, 99);
+    };
     const staplesSorted = [...(staplesData.foods || [])]
-      .map((f, i) => ({ f, i }))
-      .sort((a, b) => startsBoost(a.f) - startsBoost(b.f) || a.i - b.i)
+      .map((f, i) => ({ f, i, s: score(f) }))
+      .sort((a, b) => a.s - b.s || a.i - b.i)
       .map((x) => x.f);
 
     const otherSorted = [...(otherData.foods || [])].sort((a, b) => {
@@ -388,6 +395,9 @@ app.get("/nutrition/food/:fdcId", requireAuth, requireHousehold, async (req, res
         label = [p.amount, unit, p.modifier].filter(Boolean).join(" ").trim();
       }
       if (!label) continue;
+      // FNDDS sometimes leaks numeric modifier codes (e.g. "90000") or
+      // "Quantity not specified" pseudo-portions — skip those.
+      if (/^[0-9]+$/.test(label) || /not specified/i.test(label)) continue;
       portions.push({ label, grams: Math.round(p.gramWeight * 100) / 100 });
     }
     // Branded foods: single labeled serving instead of foodPortions
