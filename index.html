@@ -1934,74 +1934,6 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
         This day so far: {dayCals} cal · {dayProtein}g protein
       </div>
 
-      {dayMeals.length > 0 && (
-        <div className="mb-8 border border-stone-800 divide-y divide-stone-900">
-          {dayMeals.map((m) => (
-            <div key={m.id} className="flex items-center justify-between px-4 py-3">
-              <div className="min-w-0">
-                <div className="text-stone-200 text-sm truncate">{m.name}</div>
-                <div className="mono text-[10px] text-stone-500 tracking-wider uppercase">
-                  {m.mealType || 'meal'} · {m.calories || 0} cal · {m.protein || 0}g protein
-                </div>
-              </div>
-              <button
-                onClick={() => { if (confirm(`Delete "${m.name}"?`)) onDeleteMeal(m.id); }}
-                className="text-stone-600 hover:text-red-400 transition-colors ml-3 shrink-0"
-                aria-label="Delete meal"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Recipe quick-pick */}
-      {recipes.length > 0 && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase">Your recipes</div>
-            <button onClick={onManageRecipes} className="mono text-xs text-amber-600 tracking-wider uppercase hover:text-amber-400">
-              Manage
-            </button>
-          </div>
-          <div className="flex gap-2 mb-3">
-            {['all', 'lunch', 'dinner', 'snack'].map(f => (
-              <button
-                key={f}
-                onClick={() => setRecipeFilter(f)}
-                className={`mono text-xs tracking-wider uppercase px-2 py-1 border ${recipeFilter === f ? 'border-amber-600 text-amber-400' : 'border-stone-800 text-stone-500'}`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-          <div className="space-y-2">
-            {topRecipes.map(recipe => (
-              <button
-                key={recipe.id}
-                onClick={() => onUseRecipe(recipe)}
-                className="w-full border border-stone-800 hover:border-amber-600 hover:bg-amber-950/20 p-4 text-left flex items-start gap-3 transition-colors"
-              >
-                <BookOpen className="w-4 h-4 text-amber-600 flex-shrink-0 mt-1" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-stone-100 truncate">{recipe.name}</span>
-                    {recipe.favorite && <Star className="w-3 h-3 fill-amber-500 text-amber-500 flex-shrink-0" />}
-                  </div>
-                  <div className="mono text-xs text-stone-500 mt-1">
-                    {recipe.calories} cal · {recipe.protein}g protein · {recipe.mealType}
-                    {recipe.uses > 0 ? ` · ${recipe.uses}×` : ''}
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-stone-600 flex-shrink-0 mt-1" />
-              </button>
-            ))}
-          </div>
-          <div className="mono text-xs text-stone-600 tracking-wider uppercase mt-4 text-center">— or enter manually —</div>
-        </div>
-      )}
-
       <div className="space-y-6">
         <div>
           <label className="mono text-xs text-stone-500 tracking-wider uppercase mb-2 block">Meal</label>
@@ -2017,28 +1949,6 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
             ))}
           </div>
         </div>
-        {recentFoods.length > 0 && (
-          <div className="mb-6">
-            <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase mb-3">Quick add · Recent</div>
-            <div className="flex flex-wrap gap-2">
-              {recentFoods.map((rf) => (
-                <button
-                  key={rf.name}
-                  onClick={() => {
-                    setName(rf.name);
-                    setCalories(rf.calories != null ? String(rf.calories) : '');
-                    setProtein(rf.protein != null ? String(rf.protein) : '');
-                    if (rf.mealType) setMealType(rf.mealType);
-                  }}
-                  className="border border-stone-800 text-stone-300 mono text-xs px-3 py-2 hover:border-amber-700 hover:text-amber-400 transition-colors"
-                >
-                  {rf.name} <span className="text-stone-600">· {rf.calories || 0} cal</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         <Field label="What did you eat?">
           <input
             type="text"
@@ -2174,6 +2084,101 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
       >
         Save Meal
       </button>
+
+      {dayMeals.length > 0 && (
+        <div className="mt-10">
+          <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase mb-3">{isBackdated ? 'Entries this day' : "Today's entries"}</div>
+          <div className="border border-stone-800 divide-y divide-stone-900">
+          {dayMeals.map((m) => (
+            <div key={m.id} className="flex items-center justify-between px-4 py-3">
+              <div className="min-w-0">
+                <div className="text-stone-200 text-sm truncate">{m.name}</div>
+                <div className="mono text-[10px] text-stone-500 tracking-wider uppercase">
+                  {m.mealType || 'meal'} · {m.calories || 0} cal · {m.protein || 0}g protein
+                </div>
+              </div>
+              <button
+                onClick={() => { if (confirm(`Delete "${m.name}"?`)) onDeleteMeal(m.id); }}
+                className="text-stone-600 hover:text-red-400 transition-colors ml-3 shrink-0"
+                aria-label="Delete meal"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          </div>
+        </div>
+      )}
+
+
+      {recentFoods.length > 0 && (
+        <div className="mt-10">
+            <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase mb-3">Quick add · Recent</div>
+            <div className="flex flex-wrap gap-2">
+              {recentFoods.map((rf) => (
+                <button
+                  key={rf.name}
+                  onClick={() => {
+                    setName(rf.name);
+                    setCalories(rf.calories != null ? String(rf.calories) : '');
+                    setProtein(rf.protein != null ? String(rf.protein) : '');
+                    if (rf.mealType) setMealType(rf.mealType);
+                  }}
+                  className="border border-stone-800 text-stone-300 mono text-xs px-3 py-2 hover:border-amber-700 hover:text-amber-400 transition-colors"
+                >
+                  {rf.name} <span className="text-stone-600">· {rf.calories || 0} cal</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+
+      {/* Recipe quick-pick */}
+      {recipes.length > 0 && (
+        <div className="mt-10 mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase">Your recipes</div>
+            <button onClick={onManageRecipes} className="mono text-xs text-amber-600 tracking-wider uppercase hover:text-amber-400">
+              Manage
+            </button>
+          </div>
+          <div className="flex gap-2 mb-3">
+            {['all', 'lunch', 'dinner', 'snack'].map(f => (
+              <button
+                key={f}
+                onClick={() => setRecipeFilter(f)}
+                className={`mono text-xs tracking-wider uppercase px-2 py-1 border ${recipeFilter === f ? 'border-amber-600 text-amber-400' : 'border-stone-800 text-stone-500'}`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+          <div className="space-y-2">
+            {topRecipes.map(recipe => (
+              <button
+                key={recipe.id}
+                onClick={() => onUseRecipe(recipe)}
+                className="w-full border border-stone-800 hover:border-amber-600 hover:bg-amber-950/20 p-4 text-left flex items-start gap-3 transition-colors"
+              >
+                <BookOpen className="w-4 h-4 text-amber-600 flex-shrink-0 mt-1" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-stone-100 truncate">{recipe.name}</span>
+                    {recipe.favorite && <Star className="w-3 h-3 fill-amber-500 text-amber-500 flex-shrink-0" />}
+                  </div>
+                  <div className="mono text-xs text-stone-500 mt-1">
+                    {recipe.calories} cal · {recipe.protein}g protein · {recipe.mealType}
+                    {recipe.uses > 0 ? ` · ${recipe.uses}×` : ''}
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-stone-600 flex-shrink-0 mt-1" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
