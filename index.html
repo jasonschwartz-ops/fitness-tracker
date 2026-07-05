@@ -451,12 +451,13 @@ function FitnessTracker() {
   const [customExercises, setCustomExercises] = useState({}); // { A: [exDef], B: [...], ... }
   const [activeWorkout, setActiveWorkout] = useState(null);
   const [activeSession, setActiveSession] = useState(null);
-  const [targets, setTargets] = useState({ calories: DAILY_CAL_TARGET, protein: DAILY_PROTEIN_TARGET });
+  const [targets, setTargets] = useState({ calories: DAILY_CAL_TARGET, protein: DAILY_PROTEIN_TARGET, carbs: 0 });
 
   const saveTargets = async (t) => {
     const clean = {
       calories: Math.max(0, parseInt(t.calories) || 0),
       protein: Math.max(0, parseInt(t.protein) || 0),
+      carbs: Math.max(0, parseInt(t.carbs) || 0), // 0 = no carb limit
     };
     setTargets(clean);
     await storage.set('user_targets', JSON.stringify(clean));
@@ -473,9 +474,10 @@ function FitnessTracker() {
         if (savedTargets?.value) {
           try {
             const t = JSON.parse(savedTargets.value);
-            if (t.calories || t.protein) setTargets({
+            if (t.calories || t.protein || t.carbs) setTargets({
               calories: t.calories || DAILY_CAL_TARGET,
               protein: t.protein || DAILY_PROTEIN_TARGET,
+              carbs: t.carbs || 0,
             });
           } catch (e) {}
         }
@@ -707,6 +709,7 @@ function FitnessTracker() {
       name: recipe.name,
       calories: recipe.calories,
       protein: recipe.protein,
+      carbs: recipe.carbs || 0,
       mealType: recipe.mealType,
       fromRecipe: recipe.id,
     };
@@ -913,12 +916,18 @@ function HomeView({ targets, onSaveTargets, workoutLogs, walkLogs, weighIns, mea
   const [editingTargets, setEditingTargets] = useState(false);
   const [tCal, setTCal] = useState('');
   const [tProt, setTProt] = useState('');
+  const [tCarb, setTCarb] = useState('');
   const today = todayStr();
   const isToday = selectedDate === today;
   const isFuture = selectedDate > today;
   const dayMeals = mealLogs.filter(m => m.date === selectedDate);
   const dayCals = dayMeals.reduce((sum, m) => sum + (m.calories || 0), 0);
   const dayProtein = dayMeals.reduce((sum, m) => sum + (m.protein || 0), 0);
+  const dayCarbs = dayMeals.reduce((sum, m) => sum + (m.carbs || 0), 0);
+  // Carbs is a CEILING, not a goal: green under, amber near (>=80%), red over
+  const carbTone = targets.carbs > 0 && dayCarbs > targets.carbs ? 'text-red-400'
+    : targets.carbs > 0 && dayCarbs >= targets.carbs * 0.8 ? 'text-amber-400'
+    : 'text-stone-100';
   const dayWalk = walkLogs.find(w => w.date === selectedDate);
   const dayWeight = weighIns.find(w => w.date === selectedDate);
   const dayWorkout = workoutLogs.find(w => w.date === selectedDate);
@@ -995,6 +1004,9 @@ function HomeView({ targets, onSaveTargets, workoutLogs, walkLogs, weighIns, mea
         />
         <StatCard label="Calories" value={dayCals || '—'} unit={dayCals ? `/ ${targets.calories}` : ''} icon={<Utensils className="w-4 h-4" />} />
         <StatCard label="Protein" value={dayProtein || '—'} unit={dayProtein ? `g / ${targets.protein}g` : ''} icon={<Target className="w-4 h-4" />} />
+        {targets.carbs > 0 && (
+          <StatCard label="Carbs" value={dayCarbs || '—'} unit={dayCarbs ? `g / ≤${targets.carbs}g` : `limit ${targets.carbs}g`} icon={<Utensils className="w-4 h-4" />} valueClass={carbTone} />
+        )}
       </div>
 
       {/* Next workout (only show on today/future) */}
@@ -1102,14 +1114,14 @@ function HomeView({ targets, onSaveTargets, workoutLogs, walkLogs, weighIns, mea
         <div className="mono text-[10px] text-stone-600 tracking-[0.2em] uppercase text-center mb-2">Daily targets</div>
         {!editingTargets ? (
           <button
-            onClick={() => { setTCal(String(targets.calories)); setTProt(String(targets.protein)); setEditingTargets(true); }}
+            onClick={() => { setTCal(String(targets.calories)); setTProt(String(targets.protein)); setTCarb(String(targets.carbs || 0)); setEditingTargets(true); }}
             className="w-full border border-stone-800 text-stone-400 mono text-xs tracking-wider py-3 mb-6 hover:bg-stone-900 hover:text-stone-200 transition-colors"
           >
-            {targets.calories} CAL · {targets.protein}G PROTEIN — TAP TO EDIT
+            {targets.calories} CAL · {targets.protein}G PROTEIN{targets.carbs ? ` · ≤${targets.carbs}G CARBS` : ''} — TAP TO EDIT
           </button>
         ) : (
           <div className="border border-stone-800 p-4 mb-6">
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-3 gap-3 mb-3">
               <div>
                 <div className="mono text-[10px] text-stone-500 tracking-wider uppercase mb-1">Calories</div>
                 <input type="number" value={tCal} onChange={(e) => setTCal(e.target.value)}
@@ -1120,10 +1132,15 @@ function HomeView({ targets, onSaveTargets, workoutLogs, walkLogs, weighIns, mea
                 <input type="number" value={tProt} onChange={(e) => setTProt(e.target.value)}
                   className="w-full bg-transparent border border-stone-700 text-stone-200 text-center py-2 mono text-sm focus:border-amber-600 outline-none" />
               </div>
+              <div>
+                <div className="mono text-[10px] text-stone-500 tracking-wider uppercase mb-1">Carb limit</div>
+                <input type="number" value={tCarb} onChange={(e) => setTCarb(e.target.value)} placeholder="0 = off"
+                  className="w-full bg-transparent border border-stone-700 text-stone-200 text-center py-2 mono text-sm focus:border-amber-600 outline-none" />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => { onSaveTargets({ calories: tCal, protein: tProt }); setEditingTargets(false); }}
+                onClick={() => { onSaveTargets({ calories: tCal, protein: tProt, carbs: tCarb }); setEditingTargets(false); }}
                 className="border border-amber-700 text-amber-400 mono text-xs tracking-wider uppercase py-2 hover:bg-amber-950/40"
               >
                 Save
@@ -1209,14 +1226,14 @@ function HomeView({ targets, onSaveTargets, workoutLogs, walkLogs, weighIns, mea
   );
 }
 
-function StatCard({ label, value, unit, icon }) {
+function StatCard({ label, value, unit, icon, valueClass }) {
   return (
     <div className="border border-stone-800 p-4 bg-stone-900/30 grain">
       <div className="flex items-center gap-2 text-stone-500 mb-2">
         {icon}
         <span className="mono text-xs tracking-wider uppercase">{label}</span>
       </div>
-      <div className="display text-3xl text-stone-100 leading-none">
+      <div className={`display text-3xl leading-none ${valueClass || 'text-stone-100'}`}>
         {value}
         {unit && <span className="mono text-xs text-stone-500 ml-1">{unit}</span>}
       </div>
@@ -1812,6 +1829,7 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
   const [name, setName] = useState('');
   const [calories, setCalories] = useState('');
   const [protein, setProtein] = useState('');
+  const [carbs, setCarbs] = useState('');
   const [mealType, setMealType] = useState('lunch');
   const [recipeFilter, setRecipeFilter] = useState('all');
 
@@ -1821,12 +1839,12 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
     for (const m of mealLogs) {
       if (!m.name) continue;
       const key = m.name.trim().toLowerCase();
-      if (!byName[key]) byName[key] = { name: m.name, calories: m.calories, protein: m.protein, mealType: m.mealType, count: 0, last: 0 };
+      if (!byName[key]) byName[key] = { name: m.name, calories: m.calories, protein: m.protein, carbs: m.carbs, mealType: m.mealType, count: 0, last: 0 };
       byName[key].count += 1;
       byName[key].last = Math.max(byName[key].last, m.timestamp || 0);
       // keep most recent macros for the entry
       if ((m.timestamp || 0) >= byName[key].last) {
-        byName[key].calories = m.calories; byName[key].protein = m.protein;
+        byName[key].calories = m.calories; byName[key].protein = m.protein; byName[key].carbs = m.carbs;
       }
     }
     return Object.values(byName)
@@ -1876,6 +1894,7 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
   const dayMeals = mealLogs.filter(m => m.date === selectedDate);
   const dayCals = dayMeals.reduce((s, m) => s + (m.calories || 0), 0);
   const dayProtein = dayMeals.reduce((s, m) => s + (m.protein || 0), 0);
+  const dayCarbs = dayMeals.reduce((s, m) => s + (m.carbs || 0), 0);
   const isBackdated = selectedDate !== todayStr();
 
   const runFoodSearch = async () => {
@@ -1893,6 +1912,7 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
           name: [f.description, f.brand ? `(${f.brand})` : ''].filter(Boolean).join(' ').trim(),
           kcal100: f.calories != null ? f.calories : null,
           protein100: f.protein != null ? f.protein : null,
+          carbs100: f.carbs != null ? f.carbs : null,
           servingSize: f.servingSize ? `${f.servingSize}${f.servingSizeUnit || ''}` : null,
         }))
         .filter(p => p.name && (p.kcal100 != null || p.protein100 != null));
@@ -1912,6 +1932,7 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
     const factor = grams / 100;
     if (r.kcal100 != null) setCalories(String(Math.round(r.kcal100 * factor)));
     if (r.protein100 != null) setProtein(String(Math.round(r.protein100 * factor)));
+    if (r.carbs100 != null) setCarbs(String(Math.round(r.carbs100 * factor)));
     if (!name) setName(r.name);
     // collapse results after picking
     setSearchResults([]);
@@ -1931,7 +1952,7 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
       </div>
       <h1 className="display text-5xl mb-2">Log a meal.</h1>
       <div className="mono text-xs text-stone-500 tracking-wider uppercase mb-8">
-        This day so far: {dayCals} cal · {dayProtein}g protein
+        This day so far: {dayCals} cal · {dayProtein}g protein{dayCarbs ? ` · ${dayCarbs}g carbs` : ''}
       </div>
 
       <div className="space-y-6">
@@ -2052,13 +2073,13 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
             </div>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-3">
           <Field label="Calories">
             <input
               type="number"
               value={calories}
               onChange={(e) => setCalories(e.target.value)}
-              className="w-full bg-transparent border-b border-stone-700 text-3xl display py-3 focus:border-amber-600 outline-none"
+              className="w-full bg-transparent border-b border-stone-700 text-2xl display py-3 focus:border-amber-600 outline-none"
             />
           </Field>
           <Field label="Protein (g)">
@@ -2066,7 +2087,15 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
               type="number"
               value={protein}
               onChange={(e) => setProtein(e.target.value)}
-              className="w-full bg-transparent border-b border-stone-700 text-3xl display py-3 focus:border-amber-600 outline-none"
+              className="w-full bg-transparent border-b border-stone-700 text-2xl display py-3 focus:border-amber-600 outline-none"
+            />
+          </Field>
+          <Field label="Carbs (g)">
+            <input
+              type="number"
+              value={carbs}
+              onChange={(e) => setCarbs(e.target.value)}
+              className="w-full bg-transparent border-b border-stone-700 text-2xl display py-3 focus:border-amber-600 outline-none"
             />
           </Field>
         </div>
@@ -2077,6 +2106,7 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
           name,
           calories: parseInt(calories) || 0,
           protein: parseInt(protein) || 0,
+          carbs: parseInt(carbs) || 0,
           mealType,
         })}
         disabled={!name}
@@ -2094,7 +2124,7 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
               <div className="min-w-0">
                 <div className="text-stone-200 text-sm truncate">{m.name}</div>
                 <div className="mono text-[10px] text-stone-500 tracking-wider uppercase">
-                  {m.mealType || 'meal'} · {m.calories || 0} cal · {m.protein || 0}g protein
+                  {m.mealType || 'meal'} · {m.calories || 0} cal · {m.protein || 0}g protein{m.carbs ? ` · ${m.carbs}g carbs` : ''}
                 </div>
               </div>
               <button
@@ -2122,6 +2152,7 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
                     setName(rf.name);
                     setCalories(rf.calories != null ? String(rf.calories) : '');
                     setProtein(rf.protein != null ? String(rf.protein) : '');
+                    setCarbs(rf.carbs != null ? String(rf.carbs) : '');
                     if (rf.mealType) setMealType(rf.mealType);
                   }}
                   className="border border-stone-800 text-stone-300 mono text-xs px-3 py-2 hover:border-amber-700 hover:text-amber-400 transition-colors"
@@ -2422,6 +2453,7 @@ function RecipeEditor({ recipe, onSave, onCancel }) {
   const [name, setName] = useState(recipe?.name || '');
   const [calories, setCalories] = useState(recipe?.calories?.toString() || '');
   const [protein, setProtein] = useState(recipe?.protein?.toString() || '');
+  const [rCarbs, setRCarbs] = useState(recipe?.carbs?.toString() || '');
   const [mealType, setMealType] = useState(recipe?.mealType || 'lunch');
   const [notes, setNotes] = useState(recipe?.notes || '');
 
@@ -2475,6 +2507,14 @@ function RecipeEditor({ recipe, onSave, onCancel }) {
               className="w-full bg-transparent border-b border-stone-700 text-3xl display py-3 focus:border-amber-600 outline-none"
             />
           </Field>
+          <Field label="Carbs (g)">
+            <input
+              type="number"
+              value={rCarbs}
+              onChange={(e) => setRCarbs(e.target.value)}
+              className="w-full bg-transparent border-b border-stone-700 text-3xl display py-3 focus:border-amber-600 outline-none"
+            />
+          </Field>
         </div>
 
         <Field label="Notes (ingredients, prep, etc.)">
@@ -2494,6 +2534,7 @@ function RecipeEditor({ recipe, onSave, onCancel }) {
           name,
           calories: parseInt(calories) || 0,
           protein: parseInt(protein) || 0,
+          carbs: parseInt(rCarbs) || 0,
           mealType,
           notes,
         })}
