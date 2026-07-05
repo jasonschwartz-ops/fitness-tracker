@@ -409,14 +409,23 @@ const STARTER_ROUTES = [
   { id: 'rt3', name: 'Quick out-and-back', miles: 2.0, minutes: 35, notes: 'Short day, still counts' },
 ];
 
+function localDateStr(d = new Date()) {
+  // Date in the user's LOCAL timezone (toISOString would give UTC,
+  // which rolls to "tomorrow" at 8pm ET and breaks evening logging)
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function todayStr() {
-  return new Date().toISOString().split('T')[0];
+  return localDateStr();
 }
 
 function dateStrOffset(baseStr, offsetDays) {
   const d = new Date(baseStr + 'T12:00:00');
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().split('T')[0];
+  return localDateStr(d);
 }
 
 function humanDate(dateStr) {
@@ -929,7 +938,7 @@ function HomeView({ targets, onSaveTargets, workoutLogs, walkLogs, weighIns, mea
     ]);
     let streak = 0;
     const d = new Date();
-    while (allDates.has(d.toISOString().split('T')[0])) {
+    while (allDates.has(localDateStr(d))) {
       streak++;
       d.setDate(d.getDate() - 1);
     }
@@ -1853,12 +1862,14 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
     setPortionLoading(pl => ({ ...pl, [idx]: false }));
   };
 
-  const pickPortion = (idx, sel, qty) => {
+  const pickPortion = (idx, sel, qtyRaw) => {
     setPortionSelById(s => ({ ...s, [idx]: sel }));
-    setQtyById(q => ({ ...q, [idx]: qty }));
+    setQtyById(q => ({ ...q, [idx]: qtyRaw })); // keep raw so field can be emptied while typing
+    const qty = parseFloat(qtyRaw);
+    const effQty = isNaN(qty) || qty <= 0 ? 1 : qty;
     const plist = portionsById[idx] || [];
     if (sel !== 'g' && plist[sel]) {
-      setGramsById(g => ({ ...g, [idx]: String(Math.round(plist[sel].grams * qty)) }));
+      setGramsById(g => ({ ...g, [idx]: String(Math.round(plist[sel].grams * effQty)) }));
     }
   };
 
@@ -2086,16 +2097,17 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
                     <div className="flex items-center gap-2 mb-2">
                       <input
                         type="number"
-                        min="0.25"
+                        min="0"
                         step="0.25"
+                        placeholder="1"
                         value={qtyById[idx] ?? 1}
-                        onChange={(e) => pickPortion(idx, portionSelById[idx] ?? 0, parseFloat(e.target.value) || 1)}
+                        onChange={(e) => pickPortion(idx, portionSelById[idx] ?? 0, e.target.value)}
                         className="w-14 bg-transparent border border-stone-700 text-center py-1 mono text-sm focus:border-amber-600 outline-none"
                       />
                       <span className="mono text-[10px] text-stone-500">×</span>
                       <select
                         value={portionSelById[idx] ?? 0}
-                        onChange={(e) => pickPortion(idx, parseInt(e.target.value), qtyById[idx] ?? 1)}
+                        onChange={(e) => pickPortion(idx, parseInt(e.target.value), qtyById[idx] ?? '1')}
                         className="flex-1 bg-stone-950 border border-stone-700 text-stone-200 mono text-xs py-1 px-2 focus:border-amber-600 outline-none"
                       >
                         {(portionsById[idx] || []).map((p, pi) => (
