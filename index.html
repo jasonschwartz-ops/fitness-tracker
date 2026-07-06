@@ -1014,8 +1014,29 @@ function HomeView({ targets, onSaveTargets, workoutLogs, walkLogs, weighIns, mea
         )}
       </div>
 
-      {/* Next workout (only show on today/future) */}
-      {isToday && (
+      {/* Workout complete today: show the accomplishment, not the next day */}
+      {isToday && dayWorkout && (
+        <div className="mb-6 border border-emerald-800 bg-emerald-950/20 p-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Check className="w-4 h-4 text-emerald-500" />
+            <div className="mono text-xs text-emerald-500 tracking-[0.2em] uppercase">Training complete</div>
+          </div>
+          <div className="display text-4xl leading-none text-stone-100">{WORKOUTS[dayWorkout.workout]?.name || `Day ${dayWorkout.workout}`}</div>
+          <div className="mono text-xs text-stone-500 mt-2">
+            {dayWorkout.exercises.reduce((s, e) => s + e.sets.length, 0)} sets across {dayWorkout.exercises.length} exercises
+            {' · '}Day {WORKOUT_CYCLE[(WORKOUT_CYCLE.indexOf(dayWorkout.workout) + 1) % WORKOUT_CYCLE.length]} up tomorrow
+          </div>
+          <button
+            onClick={() => onStartWorkout(nextWorkoutKey)}
+            className="mt-4 mono text-[10px] tracking-wider uppercase text-stone-600 hover:text-stone-300"
+          >
+            Train again anyway →
+          </button>
+        </div>
+      )}
+
+      {/* Next workout (only when today's training isn't done) */}
+      {isToday && !dayWorkout && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase">Next session</div>
@@ -2604,6 +2625,83 @@ function RecipeEditor({ recipe, onSave, onCancel }) {
   const [rCarbs, setRCarbs] = useState(recipe?.carbs?.toString() || '');
   const [mealType, setMealType] = useState(recipe?.mealType || 'lunch');
   const [notes, setNotes] = useState(recipe?.notes || '');
+  const [ingredients, setIngredients] = useState(recipe?.ingredients || []);
+
+  // ---- Ingredient nutrition lookup ----
+  const [iq, setIq] = useState('');
+  const [iResults, setIResults] = useState([]);
+  const [iSearching, setISearching] = useState(false);
+  const [iError, setIError] = useState('');
+  const [iGrams, setIGrams] = useState({});      // idx -> grams string
+  const [iPortions, setIPortions] = useState({}); // idx -> [{label, grams}]
+  const [iPortLoading, setIPortLoading] = useState({});
+
+  const runIngredientSearch = async () => {
+    const q = iq.trim();
+    if (!q) return;
+    setISearching(true); setIError(''); setIResults([]);
+    setIGrams({}); setIPortions({}); setIPortLoading({});
+    try {
+      const data = await authedFetch('/nutrition/search?q=' + encodeURIComponent(q));
+      const products = (data.foods || [])
+        .map(f => ({
+          fdcId: f.fdcId,
+          name: [f.description, f.brand ? `(${f.brand})` : ''].filter(Boolean).join(' ').trim(),
+          kcal100: f.calories != null ? f.calories : null,
+          protein100: f.protein != null ? f.protein : null,
+          carbs100: f.carbs != null ? f.carbs : null,
+        }))
+        .filter(p => p.name && p.kcal100 != null);
+      if (!products.length) setIError('No matches. Try a simpler term.');
+      setIResults(products.slice(0, 8));
+    } catch (e) {
+      setIError('Lookup failed: ' + e.message);
+    }
+    setISearching(false);
+  };
+
+  const loadIngredientPortions = async (r, idx) => {
+    if (!r.fdcId || iPortions[idx]) return;
+    setIPortLoading(p => ({ ...p, [idx]: true }));
+    try {
+      const d = await authedFetch('/nutrition/food/' + r.fdcId);
+      setIPortions(p => ({ ...p, [idx]: d.portions || [] }));
+      if ((d.portions || []).length > 0) {
+        setIGrams(g => ({ ...g, [idx]: String(Math.round(d.portions[0].grams)) }));
+      }
+    } catch (e) {
+      setIPortions(p => ({ ...p, [idx]: [] }));
+    }
+    setIPortLoading(p => ({ ...p, [idx]: false }));
+  };
+
+  const addIngredient = (r, idx) => {
+    const grams = parseFloat(iGrams[idx]) || 100;
+    const factor = grams / 100;
+    const item = {
+      name: r.name,
+      grams,
+      calories: Math.round((r.kcal100 || 0) * factor),
+      protein: Math.round((r.protein100 || 0) * factor),
+      carbs: Math.round((r.carbs100 || 0) * factor),
+    };
+    const next = [...ingredients, item];
+    setIngredients(next);
+    applyTotals(next);
+  };
+
+  const removeIngredient = (i) => {
+    const next = ingredients.filter((_, x) => x !== i);
+    setIngredients(next);
+    if (next.length > 0) applyTotals(next);
+  };
+
+  // Auto-fill the macro fields from ingredient totals (still hand-editable after)
+  const applyTotals = (list) => {
+    setCalories(String(list.reduce((s, x) => s + (x.calories || 0), 0)));
+    setProtein(String(list.reduce((s, x) => s + (x.protein || 0), 0)));
+    setRCarbs(String(list.reduce((s, x) => s + (x.carbs || 0), 0)));
+  };
 
   return (
     <div className="px-6 pt-8">
@@ -2638,6 +2736,99 @@ function RecipeEditor({ recipe, onSave, onCancel }) {
           </div>
         </div>
 
+        {/* ---- Ingredient builder ---- */}
+        <div className="border border-stone-800 p-4">
+          <div className="mono text-xs text-stone-500 tracking-wider uppercase mb-3">Build from ingredients</div>
+
+          {ingredients.length > 0 && (
+            <div className="divide-y divide-stone-900 border border-stone-800 mb-4">
+              {ingredients.map((ing, i) => (
+                <div key={i} className="flex items-center justify-between px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="text-stone-200 text-sm truncate">{ing.name}</div>
+                    <div className="mono text-[10px] text-stone-500">
+                      {ing.grams}g · {ing.calories} cal · {ing.protein}g P · {ing.carbs}g C
+                    </div>
+                  </div>
+                  <button onClick={() => removeIngredient(i)} className="text-stone-600 hover:text-red-400 ml-3 shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              <div className="px-3 py-2 mono text-[10px] text-amber-500 tracking-wider">
+                TOTAL: {ingredients.reduce((s, x) => s + x.calories, 0)} CAL · {ingredients.reduce((s, x) => s + x.protein, 0)}G P · {ingredients.reduce((s, x) => s + x.carbs, 0)}G C
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={iq}
+              onChange={(e) => setIq(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && runIngredientSearch()}
+              placeholder="e.g. salmon"
+              className="flex-1 bg-transparent border-b border-stone-700 py-2 text-sm focus:border-amber-600 outline-none placeholder:text-stone-700"
+            />
+            <button
+              onClick={runIngredientSearch}
+              disabled={iSearching}
+              className="border border-stone-700 text-stone-300 mono text-xs tracking-wider uppercase px-4 hover:border-amber-700 hover:text-amber-400 disabled:opacity-50"
+            >
+              {iSearching ? '…' : 'Search'}
+            </button>
+          </div>
+          {iError && <div className="mono text-xs text-stone-600 mb-2">{iError}</div>}
+
+          {iResults.length > 0 && (
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+              {iResults.map((r, idx) => (
+                <div key={idx} className="border border-stone-800 p-3">
+                  <div className="text-sm text-stone-200 mb-1">{r.name}</div>
+                  <div className="mono text-[10px] text-stone-500 mb-2">
+                    per 100g: {Math.round(r.kcal100)} cal · {r.protein100 != null ? Math.round(r.protein100) : '?'}g P · {r.carbs100 != null ? Math.round(r.carbs100) : '?'}g C
+                  </div>
+                  {iPortions[idx] === undefined && r.fdcId && (
+                    <button
+                      onClick={() => loadIngredientPortions(r, idx)}
+                      disabled={iPortLoading[idx]}
+                      className="mono text-[10px] tracking-wider uppercase border border-stone-700 text-stone-400 px-2 py-1 mb-2 hover:border-amber-700 hover:text-amber-400 disabled:opacity-50"
+                    >
+                      {iPortLoading[idx] ? 'Loading…' : 'Portions'}
+                    </button>
+                  )}
+                  {(iPortions[idx] || []).length > 0 && (
+                    <select
+                      onChange={(e) => setIGrams(g => ({ ...g, [idx]: e.target.value }))}
+                      className="w-full bg-stone-950 border border-stone-700 text-stone-200 mono text-xs py-1 px-2 mb-2 focus:border-amber-600 outline-none"
+                    >
+                      {(iPortions[idx] || []).map((p, pi) => (
+                        <option key={pi} value={Math.round(p.grams)}>{p.label} ({Math.round(p.grams)}g)</option>
+                      ))}
+                    </select>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={iGrams[idx] ?? 100}
+                      onChange={(e) => setIGrams(g => ({ ...g, [idx]: e.target.value }))}
+                      onFocus={(e) => e.target.select()}
+                      className="w-20 bg-transparent border border-stone-700 text-center py-1 mono text-sm focus:border-amber-600 outline-none"
+                    />
+                    <span className="mono text-[10px] text-stone-500 tracking-wider uppercase">grams</span>
+                    <button
+                      onClick={() => addIngredient(r, idx)}
+                      className="ml-auto mono text-xs tracking-wider uppercase border border-amber-700 text-amber-400 px-3 py-1 hover:bg-amber-950/40"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <Field label="Calories">
             <input
@@ -2665,11 +2856,11 @@ function RecipeEditor({ recipe, onSave, onCancel }) {
           </Field>
         </div>
 
-        <Field label="Notes (ingredients, prep, etc.)">
+        <Field label="Notes (prep, substitutions, etc.)">
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g. 8oz salmon, quinoa, broccoli, tahini"
+            placeholder="e.g. grill salmon 4 min/side; swap quinoa for rice"
             rows={4}
             className="w-full bg-transparent border border-stone-700 p-3 text-sm focus:border-amber-600 outline-none placeholder:text-stone-700 resize-none"
           />
@@ -2685,6 +2876,7 @@ function RecipeEditor({ recipe, onSave, onCancel }) {
           carbs: parseInt(rCarbs) || 0,
           mealType,
           notes,
+          ingredients,
         })}
         disabled={!name}
         className="w-full mt-10 bg-amber-600 text-stone-950 p-5 display text-2xl hover:bg-amber-500 disabled:bg-stone-800 disabled:text-stone-600 transition-colors"
