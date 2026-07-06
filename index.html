@@ -2272,7 +2272,7 @@ function ProgressView({ workoutLogs, walkLogs, weighIns, mealLogs, onBack }) {
             </div>
           )}
 
-          {weighIns.length >= 2 && <WeightChart weighIns={weighIns} />}
+          {weighIns.length >= 1 && <WeightChart weighIns={weighIns} />}
         </div>
       )}
 
@@ -2328,34 +2328,103 @@ function ProgressView({ workoutLogs, walkLogs, weighIns, mealLogs, onBack }) {
 }
 
 function WeightChart({ weighIns }) {
-  const data = [...weighIns].reverse();
-  const weights = data.map(w => w.weight);
-  const min = Math.min(...weights) - 2;
-  const max = Math.max(...weights) + 2;
-  const range = max - min;
+  const [range, setRange] = useState('all');
+  const RANGES = [
+    { key: 'w', label: 'W', days: 7 },
+    { key: 'm', label: 'M', days: 30 },
+    { key: 'q', label: '3M', days: 90 },
+    { key: 'y', label: 'Y', days: 365 },
+    { key: 'all', label: 'ALL', days: null },
+  ];
+
+  // Sanitize: drop records without a finite weight or usable date
+  // (a single bad record used to NaN-poison the polyline — points, no line)
+  const valid = weighIns
+    .map((w) => ({
+      weight: typeof w.weight === 'string' ? parseFloat(w.weight) : w.weight,
+      ts: w.timestamp || (w.date ? Date.parse(w.date + 'T12:00:00') : NaN),
+    }))
+    .filter((w) => Number.isFinite(w.weight) && Number.isFinite(w.ts))
+    .sort((a, b) => a.ts - b.ts);
+
+  const days = RANGES.find((r) => r.key === range)?.days;
+  const cutoff = days ? Date.now() - days * 86400000 : -Infinity;
+  const data = valid.filter((w) => w.ts >= cutoff);
+
   const width = 300;
   const height = 120;
-  const points = data.map((w, i) => {
-    const x = (i / (data.length - 1)) * width;
-    const y = height - ((w.weight - min) / range) * height;
-    return `${x},${y}`;
-  }).join(' ');
+  const padY = 8;
+
+  let body;
+  if (data.length < 2) {
+    body = (
+      <div className="h-32 flex items-center justify-center mono text-xs text-stone-600">
+        {valid.length < 2 ? 'Log a couple of weigh-ins to see the trend.' : 'Not enough entries in this range.'}
+      </div>
+    );
+  } else {
+    const weights = data.map((w) => w.weight);
+    const min = Math.min(...weights) - 2;
+    const max = Math.max(...weights) + 2;
+    const span = max - min || 1;
+    const t0 = data[0].ts;
+    const t1 = data[data.length - 1].ts;
+    const tSpan = t1 - t0 || 1;
+
+    // X proportional to TIME, not index — gaps between weigh-ins show as gaps
+    const coords = data.map((w) => ({
+      x: ((w.ts - t0) / tSpan) * width,
+      y: height - padY - ((w.weight - min) / span) * (height - padY * 2),
+    }));
+    const points = coords.map((c) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
+    const delta = (data[data.length - 1].weight - data[0].weight).toFixed(1);
+
+    body = (
+      <>
+        <div className="flex justify-between mono text-xs text-stone-600 mb-1">
+          <span>{Math.round(max)} lb</span>
+          <span className={delta <= 0 ? 'text-emerald-500' : 'text-amber-500'}>
+            {delta > 0 ? '+' : ''}{delta} lb this range
+          </span>
+        </div>
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-32" preserveAspectRatio="none">
+          <polyline points={points} fill="none" stroke="#d97706" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+          {coords.map((c, i) => (
+            <circle key={i} cx={c.x} cy={c.y} r="3" fill="#d97706" />
+          ))}
+        </svg>
+        <div className="flex justify-between mono text-xs text-stone-600 mt-1">
+          <span>{Math.round(min)} lb</span>
+        </div>
+        <div className="flex justify-between mono text-xs text-stone-600 mt-1">
+          <span>{new Date(data[0].ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+          <span>{new Date(data[data.length - 1].ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+        </div>
+      </>
+    );
+  }
 
   return (
     <div className="border border-stone-800 p-5">
-      <div className="mono text-xs text-stone-500 tracking-wider uppercase mb-4">Weight trend</div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-32">
-        <polyline points={points} fill="none" stroke="#d97706" strokeWidth="2" />
-        {data.map((w, i) => {
-          const x = (i / (data.length - 1)) * width;
-          const y = height - ((w.weight - min) / range) * height;
-          return <circle key={i} cx={x} cy={y} r="3" fill="#d97706" />;
-        })}
-      </svg>
-      <div className="flex justify-between mono text-xs text-stone-600 mt-2">
-        <span>{formatDate(data[0].date)}</span>
-        <span>{formatDate(data[data.length - 1].date)}</span>
+      <div className="flex items-center justify-between mb-4">
+        <div className="mono text-xs text-stone-500 tracking-wider uppercase">Weight trend</div>
+        <div className="flex gap-1">
+          {RANGES.map((r) => (
+            <button
+              key={r.key}
+              onClick={() => setRange(r.key)}
+              className={`mono text-[10px] tracking-wider px-2 py-1 border transition-colors ${
+                range === r.key
+                  ? 'border-amber-700 text-amber-400'
+                  : 'border-stone-800 text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
       </div>
+      {body}
     </div>
   );
 }
