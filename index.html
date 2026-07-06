@@ -527,7 +527,9 @@ function FitnessTracker() {
         setWorkoutLogs(workouts.sort((a, b) => b.timestamp - a.timestamp));
         setWalkLogs(walks.sort((a, b) => b.timestamp - a.timestamp));
         setYogaLogs(yogas.sort((a, b) => b.timestamp - a.timestamp));
-        setWeighIns(weights.sort((a, b) => b.timestamp - a.timestamp));
+        setWeighIns(weights
+          .filter((w) => Number.isFinite(typeof w.weight === 'string' ? parseFloat(w.weight) : w.weight) && Number.isFinite(w.timestamp))
+          .sort((a, b) => b.timestamp - a.timestamp));
         setMealLogs(meals.sort((a, b) => b.timestamp - a.timestamp));
         setRecipes(recipesFromStorage.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.uses - a.uses));
         setRoutes(routesFromStorage.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.uses - a.uses));
@@ -2329,6 +2331,7 @@ function ProgressView({ workoutLogs, walkLogs, weighIns, mealLogs, onBack }) {
 
 function WeightChart({ weighIns }) {
   const [range, setRange] = useState('all');
+  const [sel, setSel] = useState(null); // tapped point index
   const RANGES = [
     { key: 'w', label: 'W', days: 7 },
     { key: 'm', label: 'M', days: 30 },
@@ -2337,8 +2340,6 @@ function WeightChart({ weighIns }) {
     { key: 'all', label: 'ALL', days: null },
   ];
 
-  // Sanitize: drop records without a finite weight or usable date
-  // (a single bad record used to NaN-poison the polyline — points, no line)
   const valid = weighIns
     .map((w) => ({
       weight: typeof w.weight === 'string' ? parseFloat(w.weight) : w.weight,
@@ -2354,6 +2355,24 @@ function WeightChart({ weighIns }) {
   const width = 300;
   const height = 120;
   const padY = 8;
+
+  // Catmull-Rom -> cubic Bezier: smooth curve through every point
+  const smoothPath = (pts) => {
+    if (pts.length < 2) return '';
+    let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] || pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2] || p2;
+      const c1x = p1.x + (p2.x - p0.x) / 6;
+      const c1y = p1.y + (p2.y - p0.y) / 6;
+      const c2x = p2.x - (p3.x - p1.x) / 6;
+      const c2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+    }
+    return d;
+  };
 
   let body;
   if (data.length < 2) {
@@ -2371,26 +2390,35 @@ function WeightChart({ weighIns }) {
     const t1 = data[data.length - 1].ts;
     const tSpan = t1 - t0 || 1;
 
-    // X proportional to TIME, not index — gaps between weigh-ins show as gaps
     const coords = data.map((w) => ({
       x: ((w.ts - t0) / tSpan) * width,
       y: height - padY - ((w.weight - min) / span) * (height - padY * 2),
     }));
-    const points = coords.map((c) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
     const delta = (data[data.length - 1].weight - data[0].weight).toFixed(1);
+    const selPt = sel != null && data[sel] ? data[sel] : null;
 
     body = (
       <>
         <div className="flex justify-between mono text-xs text-stone-600 mb-1">
           <span>{Math.round(max)} lb</span>
-          <span className={delta <= 0 ? 'text-emerald-500' : 'text-amber-500'}>
-            {delta > 0 ? '+' : ''}{delta} lb this range
-          </span>
+          {selPt ? (
+            <span className="text-amber-400">
+              {new Date(selPt.ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {selPt.weight} lb
+            </span>
+          ) : (
+            <span className={delta <= 0 ? 'text-emerald-500' : 'text-amber-500'}>
+              {delta > 0 ? '+' : ''}{delta} lb this range
+            </span>
+          )}
         </div>
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-32" preserveAspectRatio="none">
-          <polyline points={points} fill="none" stroke="#d97706" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+          <path d={smoothPath(coords)} fill="none" stroke="#d97706" strokeWidth="2" vectorEffect="non-scaling-stroke" />
           {coords.map((c, i) => (
-            <circle key={i} cx={c.x} cy={c.y} r="3" fill="#d97706" />
+            <g key={i} onClick={() => setSel(sel === i ? null : i)} style={{ cursor: 'pointer' }}>
+              {/* generous invisible tap target */}
+              <circle cx={c.x} cy={c.y} r="14" fill="transparent" />
+              <circle cx={c.x} cy={c.y} r={sel === i ? 5 : 3} fill={sel === i ? '#fbbf24' : '#d97706'} />
+            </g>
           ))}
         </svg>
         <div className="flex justify-between mono text-xs text-stone-600 mt-1">
@@ -2412,7 +2440,7 @@ function WeightChart({ weighIns }) {
           {RANGES.map((r) => (
             <button
               key={r.key}
-              onClick={() => setRange(r.key)}
+              onClick={() => { setRange(r.key); setSel(null); }}
               className={`mono text-[10px] tracking-wider px-2 py-1 border transition-colors ${
                 range === r.key
                   ? 'border-amber-700 text-amber-400'
