@@ -918,6 +918,7 @@ function FitnessTracker() {
 
 function HomeView({ targets, onSaveTargets, workoutLogs, walkLogs, weighIns, mealLogs, yogaLogs, selectedDate, onSelectDate, onStartWorkout, onNavigate }) {
   const [editingTargets, setEditingTargets] = useState(false);
+  const [expandedRecent, setExpandedRecent] = useState(null);
   const [tCal, setTCal] = useState('');
   const [tProt, setTProt] = useState('');
   const [tCarb, setTCarb] = useState('');
@@ -1099,14 +1100,34 @@ function HomeView({ targets, onSaveTargets, workoutLogs, walkLogs, weighIns, mea
               .sort((a, b) => b.timestamp - a.timestamp)
               .slice(0, 4)
               .map(item => (
-                <div key={item.id} className="flex items-center gap-3 py-2 border-b border-stone-900 text-sm">
-                  {item.type === 'workout' ? <Dumbbell className="w-4 h-4 text-amber-600" /> : <Footprints className="w-4 h-4 text-emerald-600" />}
-                  <div className="flex-1">
-                    {item.type === 'workout'
-                      ? `Workout ${item.workout} · ${item.exercises.reduce((s, e) => s + e.sets.length, 0)} sets`
-                      : `${item.miles} mi walk · ${item.minutes} min`}
+                <div key={item.id} className="border-b border-stone-900">
+                  <div
+                    className={`flex items-center gap-3 py-2 text-sm ${item.type === 'workout' ? 'cursor-pointer' : ''}`}
+                    onClick={item.type === 'workout' ? () => setExpandedRecent(expandedRecent === item.id ? null : item.id) : undefined}
+                  >
+                    {item.type === 'workout' ? <Dumbbell className="w-4 h-4 text-amber-600" /> : <Footprints className="w-4 h-4 text-emerald-600" />}
+                    <div className="flex-1">
+                      {item.type === 'workout'
+                        ? `Workout ${item.workout} · ${item.exercises.reduce((s, e) => s + e.sets.length, 0)} sets`
+                        : `${item.miles} mi walk · ${item.minutes} min`}
+                    </div>
+                    <div className="mono text-xs text-stone-600">{formatDate(item.date)}</div>
+                    {item.type === 'workout' && (
+                      <ChevronRight className={`w-4 h-4 text-stone-600 transition-transform ${expandedRecent === item.id ? 'rotate-90' : ''}`} />
+                    )}
                   </div>
-                  <div className="mono text-xs text-stone-600">{formatDate(item.date)}</div>
+                  {item.type === 'workout' && expandedRecent === item.id && (
+                    <div className="pb-3 pl-7 space-y-1">
+                      {(item.exercises || []).map((ex, i) => (
+                        <div key={i} className="text-sm">
+                          <span className="text-stone-300">{ex.name}</span>
+                          <span className="mono text-xs text-stone-500 ml-2">
+                            {(ex.sets || []).map((s) => `${s.weight}×${s.reps}`).join('  ·  ')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
           </div>
