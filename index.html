@@ -2532,8 +2532,15 @@ function WeightChart({ weighIns }) {
 function RecipesView({ recipes, onSave, onDelete, onToggleFavorite, onBack }) {
   const [editing, setEditing] = useState(null); // null | 'new' | recipe object
   const [filter, setFilter] = useState('all');
+  const [query, setQuery] = useState('');
 
-  const filtered = filter === 'all' ? recipes : recipes.filter(r => r.mealType === filter);
+  const q = query.trim().toLowerCase();
+  const matchesQuery = (r) => !q
+    || (r.name || '').toLowerCase().includes(q)
+    || (r.notes || '').toLowerCase().includes(q)
+    || (r.ingredients || []).some((ing) => (ing.name || '').toLowerCase().includes(q));
+  const filtered = (filter === 'all' ? recipes : recipes.filter(r => r.mealType === filter))
+    .filter(matchesQuery);
 
   if (editing) {
     return (
@@ -2559,7 +2566,7 @@ function RecipesView({ recipes, onSave, onDelete, onToggleFavorite, onBack }) {
         </button>
       </div>
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-4">
         {['all', 'lunch', 'dinner', 'snack'].map(f => (
           <button
             key={f}
@@ -2571,8 +2578,29 @@ function RecipesView({ recipes, onSave, onDelete, onToggleFavorite, onBack }) {
         ))}
       </div>
 
+      <div className="relative mb-6">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search name, ingredient, or notes…"
+          className="w-full bg-transparent border-b border-stone-700 py-2 pr-8 text-sm focus:border-amber-600 outline-none placeholder:text-stone-700"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery('')}
+            className="absolute right-0 top-1/2 -translate-y-1/2 text-stone-600 hover:text-stone-300"
+            aria-label="Clear search"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
       {filtered.length === 0 && (
-        <div className="text-stone-500 italic text-sm">No recipes yet. Tap + to add one.</div>
+        <div className="text-stone-500 italic text-sm">
+          {recipes.length === 0 ? 'No recipes yet. Tap + to add one.' : 'No recipes match — adjust the search or filter.'}
+        </div>
       )}
 
       <div className="space-y-3">
