@@ -1989,10 +1989,18 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
     setSearchQuery('');
   };
 
-  const filteredRecipes = recipeFilter === 'all'
+  const [recipeQuery, setRecipeQuery] = useState('');
+  const rq = recipeQuery.trim().toLowerCase();
+  const recipeMatches = (r) => !rq
+    || (r.name || '').toLowerCase().includes(rq)
+    || (r.notes || '').toLowerCase().includes(rq)
+    || (r.ingredients || []).some((ing) => (ing.name || '').toLowerCase().includes(rq));
+  const filteredRecipes = (recipeFilter === 'all'
     ? recipes
-    : recipes.filter(r => r.mealType === recipeFilter);
-  const topRecipes = filteredRecipes.slice(0, 6);
+    : recipes.filter(r => r.mealType === recipeFilter))
+    .filter(recipeMatches);
+  // Searching shows all matches; browsing shows the top 6
+  const topRecipes = rq ? filteredRecipes : filteredRecipes.slice(0, 6);
 
   return (
     <div className="px-6 pt-8">
@@ -2235,6 +2243,27 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
               </button>
             ))}
           </div>
+          <div className="relative mb-3">
+            <input
+              type="text"
+              value={recipeQuery}
+              onChange={(e) => setRecipeQuery(e.target.value)}
+              placeholder="Search recipes…"
+              className="w-full bg-transparent border-b border-stone-700 py-2 pr-8 text-sm focus:border-amber-600 outline-none placeholder:text-stone-700"
+            />
+            {recipeQuery && (
+              <button
+                onClick={() => setRecipeQuery('')}
+                className="absolute right-0 top-1/2 -translate-y-1/2 text-stone-600 hover:text-stone-300"
+                aria-label="Clear recipe search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          {topRecipes.length === 0 && (
+            <div className="mono text-xs text-stone-600 mb-2">No recipes match.</div>
+          )}
           <div className="space-y-2">
             {topRecipes.map(recipe => (
               <button
