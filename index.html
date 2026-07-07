@@ -1990,6 +1990,26 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
   };
 
   const [recipeQuery, setRecipeQuery] = useState('');
+  const [foodSaved, setFoodSaved] = useState(false);
+
+  const saveToHousehold = async () => {
+    if (!name || !(parseInt(calories) || 0)) return;
+    try {
+      await authedFetch('/shared/foods', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: name.trim(),
+          calories: parseInt(calories) || 0,
+          protein: parseInt(protein) || 0,
+          carbs: parseInt(carbs) || 0,
+        }),
+      });
+      setFoodSaved(true);
+      setTimeout(() => setFoodSaved(false), 2500);
+    } catch (e) {
+      alert('Save to household foods failed: ' + e.message);
+    }
+  };
   const rq = recipeQuery.trim().toLowerCase();
   const recipeMatches = (r) => !rq
     || (r.name || '').toLowerCase().includes(rq)
@@ -2157,6 +2177,20 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
             />
           </Field>
         </div>
+
+        {name && (parseInt(calories) || 0) > 0 && (
+          <button
+            onClick={saveToHousehold}
+            disabled={foodSaved}
+            className={`w-full border mono text-xs tracking-wider uppercase py-3 transition-colors ${
+              foodSaved
+                ? 'border-emerald-800 text-emerald-500'
+                : 'border-stone-800 text-stone-500 hover:border-amber-700 hover:text-amber-400'
+            }`}
+          >
+            {foodSaved ? '✓ Saved — searchable by the whole household' : 'Save to household foods'}
+          </button>
+        )}
       </div>
 
       <button

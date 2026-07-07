@@ -175,7 +175,7 @@ app.delete("/api/:collection/:id", async (req, res) => {
 // =====================================================================
 // SHARED CRUD  —  top-level recipes / routes, createdBy enforced
 // =====================================================================
-const SHARED_COLLECTIONS = new Set(["recipes", "routes"]);
+const SHARED_COLLECTIONS = new Set(["recipes", "routes", "foods"]);
 
 function sharedCol(req) {
   const c = req.params.collection;
@@ -311,11 +311,71 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
       return r.json();
     };
 
-    const [staplesData, otherData] = await Promise.all([
+    // Household foods library: foods the family saved themselves — searched
+    // first because they're curated, exact, and cover restaurant items no
+    // public database has. Small collection; filter in memory.
+    const householdSearch = async () => {
+      try {
+        const snap = await db.collection("foods").limit(300).get();
+        const needle = expandedQ.toLowerCase();
+        const rawNeedle = q.toLowerCase();
+        return snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((f) => {
+            const n = (f.name || "").toLowerCase();
+            return n.includes(needle) || n.includes(rawNeedle);
+          })
+          .slice(0, 4);
+      } catch (e) {
+        console.error("household foods search failed:", e.message);
+        return [];
+      }
+    };
+
+    // Open Food Facts: crowd-sourced branded/packaged foods (no key needed).
+    // Server-side, so the CORS/503 problems that killed it client-side don't apply.
+    const offSearch = async () => {
+      try {
+        const url = new URL("https://world.openfoodfacts.org/cgi/search.pl");
+        url.searchParams.set("search_terms", q);
+        url.searchParams.set("search_simple", "1");
+        url.searchParams.set("action", "process");
+        url.searchParams.set("json", "1");
+        url.searchParams.set("page_size", "10");
+        url.searchParams.set("fields", "product_name,brands,nutriments,code");
+        const r = await fetch(url, {
+          signal: AbortSignal.timeout(4000),
+          headers: { "User-Agent": "household-fitness-tracker/1.0" },
+        });
+        if (!r.ok) return [];
+        const data = await r.json();
+        return (data.products || [])
+          .map((p) => {
+            const n = p.nutriments || {};
+            return {
+              source: "off",
+              description: (p.product_name || "").trim(),
+              brand: (p.brands || "").split(",")[0].trim() || null,
+              calories: n["energy-kcal_100g"] != null ? Math.round(n["energy-kcal_100g"]) : null,
+              protein: n["proteins_100g"] != null ? Math.round(n["proteins_100g"] * 10) / 10 : null,
+              fat: n["fat_100g"] != null ? Math.round(n["fat_100g"] * 10) / 10 : null,
+              carbs: n["carbohydrates_100g"] != null ? Math.max(0, Math.round(n["carbohydrates_100g"] * 10) / 10) : null,
+            };
+          })
+          .filter((p) => p.description && p.calories != null)
+          .slice(0, 6);
+      } catch (e) {
+        return []; // OFF slow or down: degrade silently to USDA-only
+      }
+    };
+
+    const [staplesData, otherData, household, offFoods] = await Promise.all([
       // Survey (FNDDS) = the dietary-recall dataset: consumer food names
       // with household portions. SR Legacy = classic staples with portions.
       search(["Survey (FNDDS)", "SR Legacy"], 30, "staples"),
       search(["Foundation", "Branded"], 10, "other"),
+      householdSearch(),
+      offSearch(),
     ]);
     if (!(staplesData.foods || []).length && !(otherData.foods || []).length) {
       return res.status(502).json({ error: "USDA search returned nothing" });
@@ -347,6 +407,16 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
       .filter((f) => (seen.has(f.fdcId) ? false : (seen.add(f.fdcId), true)))
       .slice(0, 12);
 
+    const householdMapped = household.map((f) => ({
+      source: "household",
+      description: f.name,
+      brand: "Household",
+      calories: f.calories ?? null,
+      protein: f.protein ?? null,
+      fat: f.fat ?? null,
+      carbs: f.carbs ?? null,
+    }));
+
     const foods = ranked.map((f) => {
       const nutrients = {};
       for (const n of f.foodNutrients || []) {
@@ -373,7 +443,16 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
       };
     });
 
-    res.json({ query: q, count: foods.length, foods });
+    // Final order: household first, USDA next, OFF last; name-dedupe across sources
+    const nameSeen = new Set();
+    const merged = [...householdMapped, ...foods, ...offFoods].filter((f) => {
+      const k = (f.description || "").toLowerCase() + "|" + (f.brand || "").toLowerCase();
+      if (nameSeen.has(k)) return false;
+      nameSeen.add(k);
+      return true;
+    }).slice(0, 15);
+
+    res.json({ query: q, count: merged.length, foods: merged });
   } catch (e) {
     console.error("USDA lookup failed:", e);
     res.status(502).json({ error: "Nutrition lookup failed" });
