@@ -560,9 +560,9 @@ function FitnessTracker() {
     const hitAllReps = lastEx.sets.every(s => s.reps >= topRep);
     if (hitAllReps) {
       const increment = exerciseId === 'squat' || exerciseId === 'rdl' || exerciseId === 'back_squat' || exerciseId === 'deadlift' ? 10 : 5;
-      return { weight: lastEx.sets[0].weight + increment, reps: lastReps, note: `+${increment} lb (progression)` };
+      return { weight: lastEx.sets[0].weight + increment, reps: lastReps, lastSets: lastEx.sets, note: `+${increment} lb (progression)` };
     }
-    return { weight: lastEx.sets[0].weight, reps: lastReps, note: 'repeat (consolidate)' };
+    return { weight: lastEx.sets[0].weight, reps: lastReps, lastSets: lastEx.sets, note: 'repeat (consolidate)' };
   };
 
   const startWorkout = (key) => {
@@ -580,10 +580,13 @@ function FitnessTracker() {
           cues: ex.cues,
           suggestedWeight: suggestion.weight,
           suggestedNote: suggestion.note,
+          lastSets: suggestion.lastSets || [],
           sets: Array(ex.sets || 3).fill(null).map((_, i) => ({
             weight: suggestion.weight,
-            // Prefill reps from last session's matching set; 0 if none
-            reps: suggestion.reps[i] != null ? suggestion.reps[i] : 0,
+            // Reps start EMPTY — last session's count is shown as a reference
+            // placeholder, but nothing counts as done until you enter today's
+            reps: '',
+            lastReps: suggestion.reps[i] != null ? suggestion.reps[i] : null,
             done: false,
           })),
         };
@@ -1455,6 +1458,11 @@ function ExerciseBlock({ ex, exIdx, isCustom, onRemove, onUpdateSet, onToggleDon
       <div className="flex items-center gap-3 mb-4">
         <div className="mono text-xs text-amber-700 tracking-wider uppercase">
           {ex.suggestedNote}
+          {(ex.lastSets || []).length > 0 && (
+            <span className="block mt-1 text-stone-500 normal-case tracking-normal">
+              Last: {ex.lastSets.map(s => `${s.weight}×${s.reps}`).join(' · ')}
+            </span>
+          )}
         </div>
         {ex.cues && (
           <button
@@ -1533,7 +1541,8 @@ function SetRow({ set, setNum, onUpdate, onToggleDone }) {
           value={set.reps}
           onChange={(e) => onUpdate('reps', e.target.value)}
           onFocus={(e) => e.target.select()}
-          className="w-12 bg-transparent border border-stone-700 text-center py-1 mono"
+          placeholder={set.lastReps != null ? String(set.lastReps) : ''}
+          className="w-12 bg-transparent border border-stone-700 text-center py-1 mono placeholder:text-stone-600"
         />
         <button onClick={() => onUpdate('reps', numR + 1)} className="w-8 h-8 border border-stone-700 text-stone-400 hover:bg-stone-800">
           <Plus className="w-3 h-3 mx-auto" />
