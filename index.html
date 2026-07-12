@@ -2007,6 +2007,20 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
     setScanning(false);
   };
 
+  const parseServingToGrams = (s) => {
+    if (!s) return null;
+    const m = s.toLowerCase().replace(',', '.').match(/([\d.]+)\s*(fl\s*oz|floz|ml|l\b|g\b|oz\b)/);
+    if (!m) return null;
+    const v = parseFloat(m[1]);
+    if (!Number.isFinite(v) || v <= 0) return null;
+    const unit = m[2].replace(/\s+/g, '');
+    if (unit === 'ml' || unit === 'g') return v;
+    if (unit === 'l') return v * 1000;
+    if (unit === 'floz') return v * 29.57;
+    if (unit === 'oz') return v * 28.35;
+    return null;
+  };
+
   const lookupBarcode = async (code) => {
     stopScanner();
     setSearchError('');
@@ -2027,6 +2041,17 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
         carbs100: d.carbs,
         servingSize: d.servingSize || null,
       }]);
+      // If the product declares a serving size, preload it as the portion so
+      // the card defaults to per-serving values, not per-100g
+      const servingGrams = parseServingToGrams(d.servingSize);
+      if (servingGrams) {
+        setPortionsById({ 0: [{ label: `1 serving (${d.servingSize})`, grams: servingGrams }] });
+        setPortionSelById({ 0: 0 });
+        setQtyById({ 0: 1 });
+        setGramsById({ 0: String(Math.round(servingGrams)) });
+      } else {
+        setPortionsById({}); setPortionSelById({}); setQtyById({}); setGramsById({});
+      }
     } catch (e) {
       setSearchError('Barcode lookup failed: ' + e.message);
     }
