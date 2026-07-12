@@ -439,6 +439,9 @@ function humanDate(dateStr) {
 
 function FitnessTracker() {
   const [view, setView] = useState('home');
+
+  // Every view change starts at the top of the page
+  React.useEffect(() => { window.scrollTo(0, 0); }, [view]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [workoutLogs, setWorkoutLogs] = useState([]);
