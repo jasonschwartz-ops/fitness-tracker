@@ -1992,6 +1992,78 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
   const [recipeQuery, setRecipeQuery] = useState('');
   const [foodSaved, setFoodSaved] = useState(false);
 
+  // ---- Barcode scanner ----
+  const [scanning, setScanning] = useState(false);
+  const [scanMsg, setScanMsg] = useState('');
+  const [manualCode, setManualCode] = useState('');
+  const [lastBarcode, setLastBarcode] = useState(null);
+  const videoRef = React.useRef(null);
+  const streamRef = React.useRef(null);
+  const scanTimerRef = React.useRef(null);
+
+  const stopScanner = () => {
+    if (scanTimerRef.current) { clearInterval(scanTimerRef.current); scanTimerRef.current = null; }
+    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+    setScanning(false);
+  };
+
+  const lookupBarcode = async (code) => {
+    stopScanner();
+    setSearchError('');
+    setSearchResults([]);
+    try {
+      const d = await authedFetch('/nutrition/barcode/' + code);
+      if (!d.found) {
+        setSearchError(`Barcode ${code} not in any database yet — search or enter manually, then "Save to household foods" and it'll scan next time.`);
+        setLastBarcode(code); // attach to the eventual manual save
+        return;
+      }
+      setLastBarcode(code);
+      // Feed the result through the existing search-result UI (grams scaling and all)
+      setSearchResults([{
+        name: [d.description, d.brand ? `(${d.brand})` : ''].filter(Boolean).join(' ').trim(),
+        kcal100: d.calories,
+        protein100: d.protein,
+        carbs100: d.carbs,
+        servingSize: d.servingSize || null,
+      }]);
+    } catch (e) {
+      setSearchError('Barcode lookup failed: ' + e.message);
+    }
+  };
+
+  const startScanner = async () => {
+    setScanMsg(''); setManualCode('');
+    setScanning(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      streamRef.current = stream;
+      // video element mounts with the overlay; attach on next tick
+      setTimeout(async () => {
+        if (!videoRef.current) return;
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+        if ('BarcodeDetector' in window) {
+          const detector = new window.BarcodeDetector({ formats: ['upc_a', 'upc_e', 'ean_13', 'ean_8'] });
+          scanTimerRef.current = setInterval(async () => {
+            try {
+              const codes = await detector.detect(videoRef.current);
+              if (codes.length > 0 && codes[0].rawValue) {
+                lookupBarcode(codes[0].rawValue.replace(/[^0-9]/g, ''));
+              }
+            } catch (e) { /* frame not ready; keep trying */ }
+          }, 300);
+        } else {
+          setScanMsg('Auto-detect not supported in this browser — type the number under the barcode below.');
+        }
+      }, 50);
+    } catch (e) {
+      setScanMsg('Camera unavailable: ' + e.message + ' — type the barcode number below.');
+    }
+  };
+
+  React.useEffect(() => () => stopScanner(), []); // cleanup on unmount
+
   const saveToHousehold = async () => {
     if (!name || !(parseInt(calories) || 0)) return;
     try {
@@ -2002,6 +2074,7 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
           calories: parseInt(calories) || 0,
           protein: parseInt(protein) || 0,
           carbs: parseInt(carbs) || 0,
+          ...(lastBarcode ? { barcode: lastBarcode } : {}),
         }),
       });
       setFoodSaved(true);
@@ -2076,6 +2149,13 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
               className="mono text-xs tracking-wider uppercase border border-stone-700 px-3 hover:bg-stone-900 disabled:text-stone-700"
             >
               {searching ? '…' : 'Search'}
+            </button>
+            <button
+              onClick={startScanner}
+              className="mono text-xs tracking-wider uppercase border border-stone-700 px-3 hover:border-amber-700 hover:text-amber-400"
+              aria-label="Scan barcode"
+            >
+              Scan
             </button>
           </div>
 
@@ -2206,6 +2286,41 @@ function MealView({ mealLogs, recipes, selectedDate, onSave, onUseRecipe, onMana
       >
         Save Meal
       </button>
+
+      {scanning && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          <div className="flex items-center justify-between p-4">
+            <div className="mono text-xs text-stone-400 tracking-[0.2em] uppercase">Scan barcode</div>
+            <button onClick={stopScanner} className="text-stone-400 hover:text-stone-100 p-2" aria-label="Close scanner">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+          <div className="flex-1 relative overflow-hidden">
+            <video ref={videoRef} playsInline muted className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-24 border-2 border-amber-500/70 rounded pointer-events-none" />
+          </div>
+          <div className="p-4 space-y-3 bg-stone-950">
+            {scanMsg && <div className="mono text-xs text-amber-500">{scanMsg}</div>}
+            {!scanMsg && <div className="mono text-xs text-stone-500 text-center">Center the barcode in the frame</div>}
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={manualCode}
+                onChange={(e) => setManualCode(e.target.value)}
+                placeholder="…or type the barcode number"
+                className="flex-1 bg-transparent border-b border-stone-700 py-2 text-sm text-stone-200 focus:border-amber-600 outline-none placeholder:text-stone-700"
+              />
+              <button
+                onClick={() => manualCode.trim() && lookupBarcode(manualCode.trim())}
+                disabled={!manualCode.trim()}
+                className="mono text-xs tracking-wider uppercase border border-amber-700 text-amber-400 px-4 disabled:opacity-40"
+              >
+                Look up
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {dayMeals.length > 0 && (
         <div className="mt-10">

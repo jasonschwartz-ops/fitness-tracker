@@ -459,6 +459,63 @@ app.get("/nutrition/search", requireAuth, requireHousehold, async (req, res) => 
   }
 });
 
+// GET /nutrition/barcode/:code -> household library first, then Open Food Facts
+app.get("/nutrition/barcode/:code", requireAuth, requireHousehold, async (req, res) => {
+  const code = req.params.code.replace(/[^0-9]/g, "");
+  if (code.length < 6) return res.status(400).json({ error: "Bad barcode" });
+
+  try {
+    // 1. Household foods saved with this barcode win outright
+    const hh = await db.collection("foods").where("barcode", "==", code).limit(1).get();
+    if (!hh.empty) {
+      const f = hh.docs[0].data();
+      return res.json({
+        found: true,
+        source: "household",
+        barcode: code,
+        description: f.name,
+        brand: "Household",
+        calories: f.calories ?? null,
+        protein: f.protein ?? null,
+        fat: f.fat ?? null,
+        carbs: f.carbs ?? null,
+        servingSize: f.servingSize || null,
+      });
+    }
+
+    // 2. Open Food Facts by UPC/EAN
+    const url = `https://world.openfoodfacts.org/api/v2/product/${code}?fields=product_name,brands,nutriments,serving_size`;
+    const r = await fetch(url, {
+      signal: AbortSignal.timeout(5000),
+      headers: { "User-Agent": "household-fitness-tracker/1.0" },
+    });
+    if (r.ok) {
+      const data = await r.json();
+      if (data.status === 1 && data.product) {
+        const p = data.product;
+        const n = p.nutriments || {};
+        return res.json({
+          found: true,
+          source: "off",
+          barcode: code,
+          description: (p.product_name || "Unknown product").trim(),
+          brand: (p.brands || "").split(",")[0].trim() || null,
+          calories: n["energy-kcal_100g"] != null ? Math.round(n["energy-kcal_100g"]) : null,
+          protein: n["proteins_100g"] != null ? Math.round(n["proteins_100g"] * 10) / 10 : null,
+          fat: n["fat_100g"] != null ? Math.round(n["fat_100g"] * 10) / 10 : null,
+          carbs: n["carbohydrates_100g"] != null ? Math.max(0, Math.round(n["carbohydrates_100g"] * 10) / 10) : null,
+          servingSize: p.serving_size || null,
+        });
+      }
+    }
+
+    res.json({ found: false, barcode: code });
+  } catch (e) {
+    console.error("barcode lookup failed:", e.message);
+    res.status(502).json({ error: "Barcode lookup failed" });
+  }
+});
+
 // GET /nutrition/food/:fdcId  ->  per-100g macros + household portions
 app.get("/nutrition/food/:fdcId", requireAuth, requireHousehold, async (req, res) => {
   if (!USDA_KEY) return res.status(500).json({ error: "USDA key not configured" });
