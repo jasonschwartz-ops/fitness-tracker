@@ -457,8 +457,10 @@ function FitnessTracker() {
 
   // ---- In-progress workout autosave (device-local, survives app kills) ----
   const DRAFT_KEY = 'fitness_tracker:workout_draft';
+  const hadSessionRef = React.useRef(false);
   React.useEffect(() => {
     if (activeSession && activeWorkout) {
+      hadSessionRef.current = true;
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify({
           workout: activeWorkout,
@@ -467,7 +469,10 @@ function FitnessTracker() {
           savedAt: Date.now(),
         }));
       } catch (e) { /* storage full: draft skipped */ }
-    } else {
+    } else if (hadSessionRef.current) {
+      // Only clear after a session existed THIS run (finish/cancel).
+      // On app launch activeSession is null — clearing here would shred
+      // the very draft the loader is about to resume.
       localStorage.removeItem(DRAFT_KEY);
     }
   }, [activeSession, activeWorkout, selectedDate]);
