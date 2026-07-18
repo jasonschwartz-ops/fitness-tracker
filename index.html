@@ -567,11 +567,15 @@ function FitnessTracker() {
         const raw = localStorage.getItem('fitness_tracker:workout_draft');
         if (raw) {
           const draft = JSON.parse(raw);
-          if (draft?.session && draft?.workout && Date.now() - (draft.savedAt || 0) < 12 * 3600 * 1000) {
+          const draftValid = draft?.session?.exercises?.length > 0
+            && Array.isArray(draft.session.exercises)
+            && WORKOUTS[draft.workout]
+            && Date.now() - (draft.savedAt || 0) < 12 * 3600 * 1000;
+          if (draftValid) {
             setActiveWorkout(draft.workout);
             setActiveSession(draft.session);
             if (draft.date) setSelectedDate(draft.date);
-            setView('workout');
+            setView('active-workout');
           } else {
             localStorage.removeItem('fitness_tracker:workout_draft');
           }
