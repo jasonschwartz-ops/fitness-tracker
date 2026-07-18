@@ -442,6 +442,23 @@ function FitnessTracker() {
 
   // Every view change starts at the top of the page
   React.useEffect(() => { window.scrollTo(0, 0); }, [view]);
+
+  // ---- In-progress workout autosave (device-local, survives app kills) ----
+  const DRAFT_KEY = 'fitness_tracker:workout_draft';
+  React.useEffect(() => {
+    if (activeSession && activeWorkout) {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          workout: activeWorkout,
+          session: activeSession,
+          date: selectedDate,
+          savedAt: Date.now(),
+        }));
+      } catch (e) { /* storage full: draft skipped */ }
+    } else {
+      localStorage.removeItem(DRAFT_KEY);
+    }
+  }, [activeSession, activeWorkout, selectedDate]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [workoutLogs, setWorkoutLogs] = useState([]);
@@ -540,6 +557,22 @@ function FitnessTracker() {
       } catch (e) {
         console.error('Load error:', e);
       }
+      // Resume an interrupted workout (draft under 12 hours old)
+      try {
+        const raw = localStorage.getItem('fitness_tracker:workout_draft');
+        if (raw) {
+          const draft = JSON.parse(raw);
+          if (draft?.session && draft?.workout && Date.now() - (draft.savedAt || 0) < 12 * 3600 * 1000) {
+            setActiveWorkout(draft.workout);
+            setActiveSession(draft.session);
+            if (draft.date) setSelectedDate(draft.date);
+            setView('workout');
+          } else {
+            localStorage.removeItem('fitness_tracker:workout_draft');
+          }
+        }
+      } catch (e) { localStorage.removeItem('fitness_tracker:workout_draft'); }
+
       setLoading(false);
     }
     loadData();
@@ -571,7 +604,8 @@ function FitnessTracker() {
   const startWorkout = (key) => {
     const workout = WORKOUTS[key];
     const extras = customExercises[key] || [];
-    const allExercises = [...workout.exercises, ...extras];
+    const removed = (customExercises.__removed || {})[key] || [];
+    const allExercises = [...workout.exercises.filter(e => !removed.includes(e.id)), ...extras];
     const session = {
       workout: key,
       exercises: allExercises.map(ex => {
@@ -615,7 +649,29 @@ function FitnessTracker() {
 
   const removeExerciseFromDay = async (dayKey, exId) => {
     const current = customExercises[dayKey] || [];
-    const updated = { ...customExercises, [dayKey]: current.filter(e => e.id !== exId) };
+    const isCustom = current.some(e => e.id === exId);
+    let updated;
+    if (isCustom) {
+      // Custom add: delete it from the day outright
+      updated = { ...customExercises, [dayKey]: current.filter(e => e.id !== exId) };
+    } else {
+      // Built-in: exclude it from this day's template (history untouched)
+      const removed = { ...(customExercises.__removed || {}) };
+      removed[dayKey] = [...new Set([...(removed[dayKey] || []), exId])];
+      updated = { ...customExercises, __removed: removed };
+    }
+    setCustomExercises(updated);
+    await storage.set('custom_exercises', JSON.stringify(updated));
+    // Drop it from the in-progress session too
+    if (activeSession) {
+      setActiveSession({ ...activeSession, exercises: activeSession.exercises.filter(e => e.id !== exId) });
+    }
+  };
+
+  const restoreExerciseToDay = async (dayKey, exId) => {
+    const removed = { ...(customExercises.__removed || {}) };
+    removed[dayKey] = (removed[dayKey] || []).filter(id => id !== exId);
+    const updated = { ...customExercises, __removed: removed };
     setCustomExercises(updated);
     await storage.set('custom_exercises', JSON.stringify(updated));
   };
@@ -825,8 +881,13 @@ function FitnessTracker() {
           onFinish={finishWorkout}
           onAddExercise={addExerciseToDay}
           onRemoveExercise={removeExerciseFromDay}
+          onRestoreExercise={restoreExerciseToDay}
           getNextWeightForDef={getNextWeightForDef}
-          onCancel={() => { setActiveSession(null); setView('home'); }}
+          onCancel={() => {
+            const hasWork = activeSession?.exercises?.some(ex => ex.sets.some(s => (parseInt(s.reps) || 0) > 0));
+            if (hasWork && !confirm('Discard this workout? Entered sets will be lost.')) return;
+            setActiveSession(null); setActiveWorkout(null); setView('home');
+          }}
         />
       )}
       {view === 'walk' && (
@@ -1308,7 +1369,7 @@ function QuickButton({ icon, label, onClick, active }) {
   );
 }
 
-function ActiveWorkoutView({ session, workoutKey, selectedDate, customExercises, onUpdateSet, onToggleDone, onFinish, onAddExercise, onRemoveExercise, getNextWeightForDef, onCancel }) {
+function ActiveWorkoutView({ session, workoutKey, selectedDate, customExercises, onUpdateSet, onToggleDone, onFinish, onAddExercise, onRemoveExercise, onRestoreExercise, getNextWeightForDef, onCancel }) {
   const workout = WORKOUTS[workoutKey];
   const totalSets = session.exercises.reduce((s, e) => s + e.sets.length, 0);
   // A set counts as "done" if either the user tapped the checkmark OR they entered reps
@@ -1357,13 +1418,38 @@ function ActiveWorkoutView({ session, workoutKey, selectedDate, customExercises,
               ex={ex}
               exIdx={exIdx}
               isCustom={isCustom}
-              onRemove={isCustom ? () => onRemoveExercise(workoutKey, ex.id) : null}
+              onRemove={() => onRemoveExercise(workoutKey, ex.id)}
               onUpdateSet={onUpdateSet}
               onToggleDone={onToggleDone}
             />
           );
         })}
       </div>
+
+      {/* Removed built-ins: restorable */}
+      {(((customExercises.__removed || {})[workoutKey]) || []).length > 0 && (
+        <div className="mt-8 border-t border-stone-800 pt-6">
+          <div className="mono text-xs text-stone-600 tracking-[0.2em] uppercase mb-3">Removed from this day</div>
+          <div className="space-y-2">
+            {((customExercises.__removed || {})[workoutKey] || []).map((id) => {
+              const def = WORKOUTS[workoutKey].exercises.find(e => e.id === id);
+              if (!def) return null;
+              return (
+                <div key={id} className="flex items-center justify-between border border-stone-900 px-3 py-2">
+                  <span className="text-stone-500 text-sm">{def.name}</span>
+                  <button
+                    onClick={() => onRestoreExercise(workoutKey, id)}
+                    className="mono text-[10px] tracking-wider uppercase border border-stone-700 text-stone-400 px-2 py-1 hover:border-amber-700 hover:text-amber-400"
+                  >
+                    Restore
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mono text-[10px] text-stone-700 mt-2">Restored exercises return on your next session of this day.</div>
+        </div>
+      )}
 
       {/* Add exercise from library */}
       <div className="mt-8 border-t border-stone-800 pt-6">
@@ -1483,9 +1569,9 @@ function ExerciseBlock({ ex, exIdx, isCustom, onRemove, onUpdateSet, onToggleDon
         >
           <PlayCircle className="w-3 h-3" /> Demo
         </a>
-        {isCustom && onRemove && (
+        {onRemove && (
           <button
-            onClick={() => { if (confirm(`Remove ${ex.name} from this day?`)) onRemove(); }}
+            onClick={() => { if (confirm(`Remove ${ex.name} from this day? Past sessions keep their history; you can restore it later.`)) onRemove(); }}
             className="mono text-xs text-stone-600 tracking-wider uppercase border border-stone-800 px-2 py-0.5 hover:text-red-400 hover:border-red-900"
           >
             Remove
