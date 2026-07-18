@@ -442,6 +442,18 @@ function FitnessTracker() {
 
   // Every view change starts at the top of the page
   React.useEffect(() => { window.scrollTo(0, 0); }, [view]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(todayStr());
+  const [workoutLogs, setWorkoutLogs] = useState([]);
+  const [walkLogs, setWalkLogs] = useState([]);
+  const [yogaLogs, setYogaLogs] = useState([]);
+  const [weighIns, setWeighIns] = useState([]);
+  const [mealLogs, setMealLogs] = useState([]);
+  const [recipes, setRecipes] = useState([]);
+  const [routes, setRoutes] = useState([]);
+  const [customExercises, setCustomExercises] = useState({}); // { A: [exDef], B: [...], ... }
+  const [activeWorkout, setActiveWorkout] = useState(null);
+  const [activeSession, setActiveSession] = useState(null);
 
   // ---- In-progress workout autosave (device-local, survives app kills) ----
   const DRAFT_KEY = 'fitness_tracker:workout_draft';
@@ -459,18 +471,6 @@ function FitnessTracker() {
       localStorage.removeItem(DRAFT_KEY);
     }
   }, [activeSession, activeWorkout, selectedDate]);
-  const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(todayStr());
-  const [workoutLogs, setWorkoutLogs] = useState([]);
-  const [walkLogs, setWalkLogs] = useState([]);
-  const [yogaLogs, setYogaLogs] = useState([]);
-  const [weighIns, setWeighIns] = useState([]);
-  const [mealLogs, setMealLogs] = useState([]);
-  const [recipes, setRecipes] = useState([]);
-  const [routes, setRoutes] = useState([]);
-  const [customExercises, setCustomExercises] = useState({}); // { A: [exDef], B: [...], ... }
-  const [activeWorkout, setActiveWorkout] = useState(null);
-  const [activeSession, setActiveSession] = useState(null);
   const [targets, setTargets] = useState({ calories: DAILY_CAL_TARGET, protein: DAILY_PROTEIN_TARGET, carbs: 0 });
 
   const saveTargets = async (t) => {
