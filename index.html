@@ -1174,15 +1174,15 @@ function HomeView({ targets, onSaveTargets, workoutLogs, walkLogs, weighIns, mea
       {/* Next workout (only when today's training isn't done) */}
       {isToday && !dayWorkout && (
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase">Next session</div>
-            <div className="flex flex-wrap gap-1 items-center justify-end max-w-[230px]">
-              <span className="mono text-[10px] text-stone-600 tracking-wider uppercase mr-1 w-full text-right">Start:</span>
+          <div className="mb-3">
+            <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase mb-2">Next session</div>
+            <div className="flex gap-1 items-center">
+              <span className="mono text-[10px] text-stone-600 tracking-wider uppercase mr-1">Start:</span>
               {WORKOUT_CYCLE.map((key) => (
                 <button
                   key={key}
                   onClick={() => onStartWorkout(key)}
-                  className={`mono text-xs tracking-wider uppercase px-2.5 py-1 border ${nextWorkoutKey === key ? 'border-amber-600 text-amber-400 bg-amber-950/30' : 'border-stone-700 text-stone-400 hover:text-stone-100'}`}
+                  className={`flex-1 mono text-xs tracking-wider uppercase py-1.5 border text-center ${nextWorkoutKey === key ? 'border-amber-600 text-amber-400 bg-amber-950/30' : 'border-stone-700 text-stone-400 hover:text-stone-100'}`}
                 >
                   {key}
                 </button>
