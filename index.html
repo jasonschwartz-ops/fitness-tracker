@@ -373,10 +373,70 @@ const WORKOUTS = {
         cues: 'Forearms down, body in a straight line, brace abs and glutes hard. Don\u2019t let hips sag or pike. Log seconds held in the reps field.' },
     ],
   },
+  E: {
+    name: 'Day E',
+    focus: 'Upper • Horizontal II',
+    cue: 'Incline: 30\u00b0 bench, press up and back. Row: squeeze shoulder blades, no torso heave.',
+    exercises: [
+      { id: 'incline_press', name: 'Incline DB Press', sets: 3, repRange: [8, 12], startWeight: 25,
+        cues: 'Bench at ~30\u00b0. Elbows ~45\u00b0 from torso, press up and slightly back over the collarbones. Upper chest does the work \u2014 don\u2019t turn it into a shoulder press by going too steep.' },
+      { id: 'bo_row', name: 'Bent-Over Two-DB Row', sets: 3, repRange: [8, 12], startWeight: 30,
+        cues: 'Hinge to ~45\u00b0, flat back, soft knees. Row both bells to the hips, squeeze the blades together, lower slow. If the torso starts pumping, the weight is ego.' },
+      { id: 'rear_delt_fly', name: 'Rear Delt Fly', sets: 3, repRange: [12, 20], startWeight: 10,
+        cues: 'Hinge over, slight elbow bend, lead with the pinkies out and back. Rear delts, not traps \u2014 keep the shrug out of it. Light weight, strict reps.' },
+      { id: 'hammer_curl', name: 'Hammer Curl', sets: 3, repRange: [10, 15], startWeight: 20,
+        cues: 'Neutral grip (thumbs up), elbows pinned to your sides. Hits the brachialis and forearms \u2014 the grip-strength curl. No swinging.' },
+    ],
+  },
+  F: {
+    name: 'Day F',
+    focus: 'Lower • Squat II',
+    cue: 'Elevated heels let the knees travel \u2014 sit tall, quads on fire. Lunges: control the descent.',
+    exercises: [
+      { id: 'he_goblet', name: 'Heels-Elevated Goblet Squat', sets: 3, repRange: [8, 12], startWeight: 40,
+        cues: 'Heels on a plate or wedge, DB at the chest. Sit straight down between the knees, torso tall. The elevation shifts everything to the quads \u2014 expect fire.' },
+      { id: 'rev_lunge', name: 'DB Reverse Lunge', sets: 3, repRange: [8, 12], startWeight: 20,
+        cues: 'Step back, drop the rear knee toward the floor, drive through the FRONT heel to stand. Easier on the knees than forward lunges. Per-leg reps.' },
+      { id: 'sl_calf', name: 'Single-Leg Calf Raise', sets: 3, repRange: [10, 15], startWeight: 25,
+        cues: 'One DB in the same-side hand, other hand on a wall for balance. Full stretch at the bottom, pause at the top. Unilateral finds the imbalances.' },
+      { id: 'side_plank', name: 'Side Plank', sets: 3, repRange: [1, 1], startWeight: 0,
+        cues: 'Elbow under shoulder, body in one straight line, hips high. 30\u201345s per side. Log weight 0 and 1 rep per completed hold.' },
+    ],
+  },
+  G: {
+    name: 'Day G',
+    focus: 'Upper • Vertical II',
+    cue: 'Arnold press: rotate through the full arc. Chin-ups: chest to bar, biceps along for the ride.',
+    exercises: [
+      { id: 'arnold_press', name: 'Arnold Press', sets: 3, repRange: [8, 12], startWeight: 25,
+        cues: 'Start palms facing you at shoulder height, rotate out as you press overhead. Longer range of motion than strict OHP \u2014 lighter weight, more delt.' },
+      { id: 'chinup', name: 'Chin-up / Underhand Pulldown', sets: 3, repRange: [6, 10], startWeight: 0,
+        cues: 'Palms toward you, shoulder-width. Pull chest to the bar, control the negative. Biases biceps and lower lats vs. the overhand pull-up. Log added weight, or pulldown stack weight.' },
+      { id: 'pullover', name: 'DB Pullover', sets: 3, repRange: [10, 12], startWeight: 30,
+        cues: 'Lie across a bench, one DB held over the chest in both hands. Lower behind the head to a deep lat stretch, pull back over. Ribs down \u2014 don\u2019t arch to cheat range.' },
+      { id: 'lying_tri', name: 'Lying DB Tricep Extension', sets: 3, repRange: [10, 15], startWeight: 15,
+        cues: 'On your back, bells over the chest, hinge only at the elbows lowering toward the ears. Elbows stay pointed at the ceiling. Skullcrushers without the skull-crushing.' },
+    ],
+  },
+  H: {
+    name: 'Day H',
+    focus: 'Lower • Hinge II',
+    cue: 'Single-leg RDL: slow and square. Hip thrust: squeeze at the top like it owes you money.',
+    exercises: [
+      { id: 'sl_rdl', name: 'Single-Leg RDL', sets: 3, repRange: [8, 12], startWeight: 25,
+        cues: 'DB in the opposite hand of the working leg. Hinge until the hamstring says stop, hips square to the floor. Balance is the point \u2014 go lighter than pride suggests. Per-leg reps.' },
+      { id: 'hip_thrust', name: 'DB Hip Thrust', sets: 3, repRange: [10, 15], startWeight: 40,
+        cues: 'Upper back on a bench, DB across the hips. Drive through the heels, full lockout, chin tucked, hard glute squeeze at the top for a beat. Glutes at short length \u2014 the opposite stimulus of the RDL stretch.' },
+      { id: 'seated_calf', name: 'Seated Calf Raise', sets: 3, repRange: [12, 20], startWeight: 45,
+        cues: 'Seated, DBs on the knees, balls of feet on a plate. Bent knee targets the soleus \u2014 the calf muscle standing raises miss. Slow and full range.' },
+      { id: 'hollow_hold', name: 'Hollow Hold', sets: 3, repRange: [1, 1], startWeight: 0,
+        cues: 'On your back, lower back pressed into the floor, arms and legs hovering. 20\u201340s. The plank\u2019s meaner sibling. Log weight 0 and 1 rep per hold.' },
+    ],
+  },
 };
 
-// Order the 4-day cycle advances in
-const WORKOUT_CYCLE = ['A', 'B', 'C', 'D'];
+// Order the 8-day cycle advances in (week 1: A-D, week 2 variations: E-H)
+const WORKOUT_CYCLE = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 const DAILY_CAL_TARGET = 2100;
 const DAILY_PROTEIN_TARGET = 150;
@@ -1116,13 +1176,13 @@ function HomeView({ targets, onSaveTargets, workoutLogs, walkLogs, weighIns, mea
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <div className="mono text-xs text-stone-500 tracking-[0.2em] uppercase">Next session</div>
-            <div className="flex gap-1 items-center">
-              <span className="mono text-[10px] text-stone-600 tracking-wider uppercase mr-1">Start:</span>
+            <div className="flex flex-wrap gap-1 items-center justify-end max-w-[230px]">
+              <span className="mono text-[10px] text-stone-600 tracking-wider uppercase mr-1 w-full text-right">Start:</span>
               {WORKOUT_CYCLE.map((key) => (
                 <button
                   key={key}
                   onClick={() => onStartWorkout(key)}
-                  className={`mono text-xs tracking-wider uppercase px-3 py-1 border ${nextWorkoutKey === key ? 'border-amber-600 text-amber-400 bg-amber-950/30' : 'border-stone-700 text-stone-400 hover:text-stone-100'}`}
+                  className={`mono text-xs tracking-wider uppercase px-2.5 py-1 border ${nextWorkoutKey === key ? 'border-amber-600 text-amber-400 bg-amber-950/30' : 'border-stone-700 text-stone-400 hover:text-stone-100'}`}
                 >
                   {key}
                 </button>
